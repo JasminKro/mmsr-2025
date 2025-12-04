@@ -1,0 +1,126 @@
+import numpy as np
+from unimodal import UnimodalRetrievalSystem
+
+
+class MultimodalRetrievalSystem(UnimodalRetrievalSystem):
+    """
+    Multimodal retrieval with weighted late fusion (score averaging).
+
+    - User chooses which modalities to use (>= 2).
+    - Scores from each modality are cosine similarities.
+    - Final score is the weighted average of scores across modalities.
+    """
+
+    def __init__(self, data_root):
+        super().__init__(data_root)
+
+    def retrieve_multimodal(self, query_id, modalities, k_neighbors, weights=None):
+        """
+        Parameters
+        ----------
+        query_id : str
+            Track id of the query.
+        modalities : list of str
+            Modalities to use, e.g. ["audio", "lyrics"], must contain at least 2.
+        k_neighbors : int
+            Number of neighbors to retrieve.
+        weights : list of float, optional
+            Weights for each modality. If None, equal weights are used.
+            Length must match len(modalities). Non-negative, and not all zero.
+
+        Returns
+        -------
+        top_ids : list of str
+            Retrieved track ids (excluding the query id).
+        top_scores : list of float
+            Corresponding fused similarity scores.
+        """
+
+        # integrity checks
+        if not isinstance(modalities, (list, tuple)):
+            raise TypeError("modalities must be a list or tuple of modality names.")
+
+        if len(modalities) < 2:
+            raise ValueError("Multimodal retrieval requires at least 2 modalities.")
+
+        for m in modalities:
+            if m not in self.modalities:
+                raise ValueError(f"Invalid modality '{m}'. Available: {self.modalities}")
+
+        if k_neighbors <= 0:
+            raise ValueError("k_neighbors must be > 0")
+
+        # handle the weights of the different modalities 
+        if weights is None:
+            weights = np.ones(len(modalities), dtype=float)
+        else:
+            if len(weights) != len(modalities):
+                raise ValueError("weights must have the same length as modalities.")
+            weights = np.array(weights, dtype=float)
+
+        if np.any(weights < 0):
+            raise ValueError("weights must be non-negative.")
+        if np.all(weights == 0):
+            raise ValueError("At least one weight must be > 0.")
+
+        # normalize to sum to 1 -> weighted average
+        weights = weights / weights.sum()
+
+        # intersection of ids across all selected modalities 
+        id_sets = []
+        for m in modalities:
+            _, index_to_id, _ = self.data[m]
+            id_sets.append(set(index_to_id))
+
+        common_ids = set.intersection(*id_sets)
+
+        if query_id not in common_ids:
+            raise ValueError(
+                f"Query id {query_id} is not present in all selected modalities."
+            )
+
+        fused_scores = {track_id: 0.0 for track_id in common_ids}
+
+        for modality, w in zip(modalities, weights):
+            matrix, index_to_id, id_to_index = self.data[modality]
+
+            query_index = id_to_index[query_id]
+            query_vector = matrix[query_index]
+
+            modality_scores = matrix @ query_vector
+
+            # where the fusion happens
+            for track_id in common_ids:
+                idx = id_to_index[track_id]
+                fused_scores[track_id] += w * float(modality_scores[idx]) # weighted score from this modality
+
+        # exclude the query itself
+        if query_id in fused_scores:
+            del fused_scores[query_id]
+
+        # sort by fused score
+        sorted_items = sorted(fused_scores.items(), key=lambda x: x[1], reverse=True)
+
+        top_items = sorted_items[:k_neighbors]
+        top_ids = [item[0] for item in top_items]
+        top_scores = [float(item[1]) for item in top_items]
+
+        return top_ids, top_scores
+
+
+if __name__ == "__main__":
+    data_root = "./data"
+    mm = MultimodalRetrievalSystem(data_root)
+
+    query_id = "NDroPROgWm3jBxjH"  
+
+    print("\n=== MULTIMODAL RETRIEVAL ===")
+    ids, scores = mm.retrieve_multimodal(
+        query_id=query_id,
+        modalities=["audio", "lyrics", "video"],
+        k_neighbors=5,
+        weights=[0.4, 0.4, 0.2]  # or None for equal weights
+    )
+
+    print("Retrieved IDs:", ids)
+    print("Fused Scores:", scores)
