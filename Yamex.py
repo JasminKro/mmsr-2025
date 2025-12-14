@@ -36,8 +36,8 @@ def main(page: ft.Page):
     # title
     title = ft.Text(
         spans=[
-            ft.TextSpan("Music ABC ", ft.TextStyle(size=30, weight=ft.FontWeight.BOLD)),
-            ft.TextSpan("\nabcdfghijk", ft.TextStyle(size=20)),
+            ft.TextSpan("YAMEx", ft.TextStyle(size=30, weight=ft.FontWeight.BOLD)),
+            ft.TextSpan("\nYet Another Music Explorer", ft.TextStyle(size=20)),
         ],
         text_align=ft.TextAlign.CENTER
     )
