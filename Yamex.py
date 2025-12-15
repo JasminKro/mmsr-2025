@@ -90,18 +90,43 @@ def main(page: ft.Page):
                 if on_submit_callback else None
         )
 
-    create_search_title = create_search_field(
-        hint_text="Find song by title",
-        on_submit_callback=handle_search_title
+    def handle_search_now(e):
+        current_algorithm = dropdown_algorithm.value
+        current_nuber_results = current_slider_value
+        # TODO execute search logic
+        page.update()
+
+    create_search_title = ft.Column(
+        col={"xs": 12, "sm": 6, "md": 4},
+        controls=[
+            ft.Text("Song:"),
+            create_search_field(
+                hint_text="Find song by title",
+                on_submit_callback=handle_search_title
+            )
+        ]
     )
 
-    create_search_artist = create_search_field(
-        hint_text="Find songs of an artist",
-        on_submit_callback=handle_search_artist
+    create_search_artist = ft.Column(
+        col={"xs": 12, "sm": 6, "md": 4},
+        controls=[
+            ft.Text("Artist:"),
+            create_search_field(
+                hint_text="Find songs of an artist",
+                on_submit_callback=handle_search_artist
+            )
+        ]
     )
-    create_search_album = create_search_field(
-        hint_text="Find songs of an album",
-        on_submit_callback=handle_search_album
+
+    create_search_album = ft.Column(
+        col={"xs": 12, "sm": 6, "md": 4},
+        controls=[
+            ft.Text("Album:"),
+            create_search_field(
+                hint_text="Find songs of an album",
+                on_submit_callback=handle_search_album
+            )
+        ]
     )
 
     search_fields = ft.ResponsiveRow(
@@ -115,7 +140,7 @@ def main(page: ft.Page):
     results_slider = ft.Slider(
         min=1,
         max=100,
-        divisions=99,  # for step size of 1
+        divisions=20,  # for step size of 5
         value=current_slider_value,
         label="",
         on_change=handle_slider,
@@ -148,12 +173,34 @@ def main(page: ft.Page):
         border_radius=20,
         bgcolor=ft.Colors.DEEP_PURPLE_700,
         border_color=ft.Colors.DEEP_PURPLE_200,
+        filled=True,
+        fill_color=ft.Colors.DEEP_PURPLE_800,
+        trailing_icon=ft.Icon(ft.Icons.ARROW_DROP_DOWN, color=ft.Colors.WHITE),
         expand=True
     )
+
+    search_button = ft.ElevatedButton(
+        text="Search Now",
+        icon=ft.Icons.SEARCH,
+        on_click=handle_search_now,
+        color=ft.Colors.WHITE,
+        bgcolor=ft.Colors.DEEP_PURPLE_800,
+        style=ft.ButtonStyle(
+            shape=ft.RoundedRectangleBorder(radius=20),
+            side=ft.BorderSide(
+                color=ft.Colors.DEEP_PURPLE_200,
+                width=1
+            ),
+            padding=ft.padding.symmetric(horizontal=20, vertical=20),
+        ),
+        col={"xs": 6, "sm": 3, "md": 2},
+    )
+
 
     control_row = ft.ResponsiveRow(
         controls=[
             slider_group,
+            search_button,
             dropdown_algorithm,
         ],
         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
