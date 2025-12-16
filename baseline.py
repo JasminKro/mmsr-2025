@@ -1,65 +1,63 @@
 import numpy as np
-from unimodal import UnimodalRetrievalSystem
+import pandas as pd
 
 
-# based on UnimodalRetrievalSystem 
-class RandomBaselineRetrievalSystem(UnimodalRetrievalSystem): 
+class RandomBaselineRetrievalSystem:
     """
-    Random baseline: regardless of the query track, this system randomly
-    selects tracks from the rest of the dataset (same modality).
+    random baseline retrieval system.
+
+    Regardless of the query track, this system randomly selects
+    tracks from the entire dataset
     """
 
-    def retrieve(self, query_id, modality, k_neighbors):
+    def __init__(self, data_root):
+        """
+        Loads a global list of all track IDs.
+        """
+        # Any file that contains all track ids works
+        df = pd.read_csv(f"{data_root}/id_information_mmsr.tsv", sep="\t")
+        self.all_ids = df["id"].tolist()
+
+    def retrieve(self, query_id, k_neighbors):
         """
         Returns:
-            ids: list of randomly selected track IDs (length k_neighbors)
-            scores: list of random scores in [0, 1) (same length), just to
-                    keep the (ids, scores) structure compatible.
+            ids: list of randomly selected track IDs
+            scores: random scores in [0, 1)
         """
-        assert modality in self.modalities, "invalid modality: " + modality
-        assert k_neighbors > 0
+        if query_id not in self.all_ids:
+            raise ValueError(f"Query id {query_id} not found in dataset.")
 
-        # We dont need the feature matrix for random baseline (since we dont compute any similarities or similar), only the ID maps
-        _, index_to_id, id_to_index = self.data[modality]
+        if k_neighbors <= 0:
+            raise ValueError("k_neighbors must be > 0")
 
-        n_items = len(index_to_id)
+        # Remove query track
+        candidate_ids = [tid for tid in self.all_ids if tid != query_id]
 
-        # Index of the query track
-        query_index = id_to_index[query_id]
-
-        # All indices except the query itself
-        all_indices = np.arange(n_items) # all possible indices
-        candidate_indices = np.delete(all_indices, query_index)
-
-        if k_neighbors > len(candidate_indices):
+        if k_neighbors > len(candidate_ids):
             raise ValueError(
-                f"k_neighbors ({k_neighbors}) is larger than the number "
-                f"of available items minus one ({len(candidate_indices)})"
+                f"k_neighbors ({k_neighbors}) is larger than "
+                f"available candidates ({len(candidate_ids)})"
             )
 
-        # Randomly sample without replacement.
-        # No fixed random seed -> new, different results each call.
-        sampled_indices = np.random.choice(
-            candidate_indices,
+        # Random sample without replacement
+        sampled_ids = np.random.choice(
+            candidate_ids,
             size=k_neighbors,
             replace=False
-        )
+        ).tolist()
 
-        # Convert indices to IDs
-        sampled_ids = [index_to_id[i] for i in sampled_indices]
-
+        # Random scores (purely for interface compatibility)
         random_scores = np.random.rand(k_neighbors).tolist()
 
         return sampled_ids, random_scores
 
 
 if __name__ == "__main__":
-    # Example use
     data_root = "./data"
     query_id = "NDroPROgWm3jBxjH"
 
     rs = RandomBaselineRetrievalSystem(data_root)
-    ids, scores = rs.retrieve(query_id=query_id, modality="audio", k_neighbors=5)
+    ids, scores = rs.retrieve(query_id=query_id, k_neighbors=5)
 
-    print("random baseline ids:   ", ids)
-    print("random baseline scores:", scores)
+    print("Random baseline IDs:", ids)
+    print("Random baseline scores:", scores)
