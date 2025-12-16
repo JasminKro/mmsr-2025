@@ -4,17 +4,15 @@ import pandas as pd
 
 class RandomBaselineRetrievalSystem:
     """
-    random baseline retrieval system.
+    Random baseline: regardless of the query track, this system randomly
 
-    Regardless of the query track, this system randomly selects
-    tracks from the entire dataset
     """
 
     def __init__(self, data_root):
         """
         Loads a global list of all track IDs.
         """
-        # Any file that contains all track ids works
+        # any file that contains all track ids works
         df = pd.read_csv(f"{data_root}/id_information_mmsr.tsv", sep="\t")
         self.all_ids = df["id"].tolist()
 
@@ -29,8 +27,8 @@ class RandomBaselineRetrievalSystem:
 
         if k_neighbors <= 0:
             raise ValueError("k_neighbors must be > 0")
-
-        # Remove query track
+        
+        # remove query track
         candidate_ids = [tid for tid in self.all_ids if tid != query_id]
 
         if k_neighbors > len(candidate_ids):
@@ -39,14 +37,14 @@ class RandomBaselineRetrievalSystem:
                 f"available candidates ({len(candidate_ids)})"
             )
 
-        # Random sample without replacement
+        # random sample without replacement
         sampled_ids = np.random.choice(
             candidate_ids,
             size=k_neighbors,
             replace=False
         ).tolist()
 
-        # Random scores (purely for interface compatibility)
+        # random scores 
         random_scores = np.random.rand(k_neighbors).tolist()
 
         return sampled_ids, random_scores
@@ -59,5 +57,5 @@ if __name__ == "__main__":
     rs = RandomBaselineRetrievalSystem(data_root)
     ids, scores = rs.retrieve(query_id=query_id, k_neighbors=5)
 
-    print("Random baseline IDs:", ids)
+    print("Random baseline ids:", ids)
     print("Random baseline scores:", scores)
