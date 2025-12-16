@@ -1,4 +1,14 @@
 import flet as ft
+import pandas as pd
+
+from unimodal import UnimodalRetrievalSystem
+from collections import defaultdict
+
+
+DATA_ROOT = "./data"
+id_information_df = pd.read_csv(f"{DATA_ROOT}/id_information_mmsr.tsv", sep="\t")
+
+unimodal_rs = UnimodalRetrievalSystem(data_root=DATA_ROOT)
 
 def main(page: ft.Page):
     page.padding = 20
@@ -91,19 +101,120 @@ def main(page: ft.Page):
         )
 
     def handle_search_now(e):
+        song_query = search_song_field.value.split()
+        artist_query = search_artist_field.value.strip()
+        album_query = search_album_field.value.strip()
         current_algorithm = dropdown_algorithm.value
-        current_nuber_results = current_slider_value
-        # TODO execute search logic
+        current_number_results = current_slider_value
+
+        results_song.controls.clear()
+
+        query_id = "04OjszRi9rC5BlHC"
+        #query_id = resolve_unimode_query_id(
+        #    song=song_query,
+        #    artist=artist_query,
+        #    album_name=album_query
+        #)
+        if current_algorithm == "unimodal":
+            ids, scores = unimodal_rs.retrieve(
+                query_id =  query_id,
+                modality = "audio",
+                k_neighbors = current_number_results
+            )
+        print(f"Query: Artist: {artist_query}, Algorithm: {current_algorithm}, Number of results: {current_number_results}")
         page.update()
+
+
+
+    def find_ids_by_artist(artist_query: str):
+        if not artist_query:
+            return []
+
+        found_matches = id_information_df[
+            id_information_df["artist"].str.contains(
+                artist_query,  # string of search text
+                case = False,  # False for case-insensitive, True for case-sensitive
+                na = False,  #  ignore NaN values
+                regex = False  # for . or *
+            )
+        ]
+        return found_matches["id"].tolist()
+
+    def find_ids_by_song(song_query: str):
+        if not song_query:
+            return []
+
+        found_matches = id_information_df[
+            id_information_df["song"].str.contains(
+                song_query,  # string of search text
+                case = False,  # False for case-insensitive, True for case-sensitive
+                na = False,  #  ignore NaN values
+                regex = False  # for . or *
+            )
+        ]
+        return found_matches["id"].tolist()
+
+    def find_ids_by_album(album_query: str):
+        if not album_query:
+            return []
+
+        found_matches = id_information_df[
+            id_information_df["album_name"].str.contains(
+                album_query,  # string of search text
+                case = False,  # False for case-insensitive, True for case-sensitive
+                na = False,  #  ignore NaN values
+                regex = False  # for . or *
+            )
+        ]
+        return found_matches["id"].tolist()
+
+
+    def find_ids(query:str, column:str):
+        if not query:
+            return []
+        found_matches = id_information_df[
+            id_information_df[column].str.contains(
+                query,  # string of search text
+                case = False,  # False for case-insensitive, True for case-sensitive
+                na = False,  #  ignore NaN values
+                regex = False  # for . or *
+            )
+        ]
+        return found_matches["id"].tolist()
+
+    def resolve_unimode_query_id(artist, song, album_name):
+        if song:
+            id = find_ids(song, "song")
+            if id: return id
+        if artist:
+            id = find_ids(artist, "artist")
+            if id: return id
+        if album_name:
+            id = find_ids(album_name, "album_name")
+            if id: return id
+        return []
+
+
+    search_song_field = create_search_field(
+        hint_text="Find song by title",
+        on_submit_callback=handle_search_title
+    )
+
+    search_artist_field = create_search_field(
+        hint_text="Find songs of an artist",
+        on_submit_callback=handle_search_artist
+    )
+
+    search_album_field = create_search_field(
+        hint_text="Find songs of an album",
+        on_submit_callback=handle_search_album
+    )
 
     create_search_title = ft.Column(
         col={"xs": 12, "sm": 6, "md": 4},
         controls=[
             ft.Text("Song:"),
-            create_search_field(
-                hint_text="Find song by title",
-                on_submit_callback=handle_search_title
-            )
+            search_song_field
         ]
     )
 
@@ -111,10 +222,7 @@ def main(page: ft.Page):
         col={"xs": 12, "sm": 6, "md": 4},
         controls=[
             ft.Text("Artist:"),
-            create_search_field(
-                hint_text="Find songs of an artist",
-                on_submit_callback=handle_search_artist
-            )
+            search_artist_field
         ]
     )
 
@@ -122,10 +230,7 @@ def main(page: ft.Page):
         col={"xs": 12, "sm": 6, "md": 4},
         controls=[
             ft.Text("Album:"),
-            create_search_field(
-                hint_text="Find songs of an album",
-                on_submit_callback=handle_search_album
-            )
+            search_album_field
         ]
     )
 
@@ -162,11 +267,11 @@ def main(page: ft.Page):
         hint_text="choose an Algorithm",
         value="A",  # start value
         options=[
-            ft.dropdown.Option("A", "Random baseline"),
-            ft.dropdown.Option("B", "Unimodal"),
-            ft.dropdown.Option("C", "Multimodal - Early fusion"),
-            ft.dropdown.Option("D", "Multimodal - Late fusion"),
-            ft.dropdown.Option("E", "Neural-Network based")
+            ft.dropdown.Option("random", "Random baseline"),
+            ft.dropdown.Option("unimodal", "Unimodal"),
+            ft.dropdown.Option("multi_early", "Multimodal - Early fusion"),
+            ft.dropdown.Option("multi_late", "Multimodal - Late fusion"),
+            ft.dropdown.Option("neural", "Neural-Network based")
         ],
         on_change=handle_dropdown_menu,
         col={"xs": 12, "sm": 6, "md": 4},
