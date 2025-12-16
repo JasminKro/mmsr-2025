@@ -1,0 +1,3 @@
+[submodule "mmsr25"]
+	path = mmsr25
+	url = https://github.com/hcai-mms/mmsr25.git
