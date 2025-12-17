@@ -2,7 +2,14 @@ import flet as ft
 import pandas as pd
 
 from unimodal import UnimodalRetrievalSystem
-from collections import defaultdict
+from enum import Enum
+
+class RetrievalAlgorithms(str, Enum):
+    RANDOM = "random"
+    UNIMODAL = "unimodal"
+    EARLY_FUSION = "early_fusion"
+    LATE_FUSION = "late_fusion"
+    NEUTRAL_NETWORK = "neutral_network"
 
 
 DATA_ROOT = "./data"
@@ -74,16 +81,18 @@ def main(page: ft.Page):
     slider_label = ft.Text("Number of results:", color=ft.Colors.WHITE)
 
     def handle_slider(e: ft.ControlEvent):
-        slider_label.value = f" Number of results: {int(e.control.value)}"
+        global current_slider_value
+        current_slider_value = int(e.control.value)
+        slider_label.value = f" Number of results: {current_slider_value}"
         page.update()
 
     current_slider_value = 10  # default value
     slider_label = ft.Text(f"Number of results: {current_slider_value}", color=ft.Colors.WHITE)
 
     def handle_dropdown_menu(e):
-        global current_slider_value
-        current_slider_value = int(e.control.value)
-        slider_label.value = f"Number of results: {current_slider_value}"
+        global current_algorithm
+        print(repr(e.control.value))
+        current_algorithm = dropdown_algorithm.value
         page.update()
 
     def create_search_field(
@@ -109,69 +118,31 @@ def main(page: ft.Page):
 
         results_song.controls.clear()
 
-        query_id = "04OjszRi9rC5BlHC"
-        #query_id = resolve_unimode_query_id(
-        #    song=song_query,
-        #    artist=artist_query,
-        #    album_name=album_query
-        #)
-        if current_algorithm == "unimodal":
+        # query_id = "04OjszRi9rC5BlHC"
+        query_id = resolve_unimode_query_id(
+            song=song_query,
+            artist=artist_query,
+            album_name=album_query
+        )
+        if current_algorithm == RetrievalAlgorithms.UNIMODAL:
             ids, scores = unimodal_rs.retrieve(
                 query_id =  query_id,
                 modality = "audio",
                 k_neighbors = current_number_results
             )
         print(f"Query: Artist: {artist_query}, Algorithm: {current_algorithm}, Number of results: {current_number_results}")
+
+        for i, id in enumerate(ids):
+            results_song.controls.append(
+                ft.Text(f"[{i+1}] {id}", color=ft.Colors.WHITE)
+            )
+
         page.update()
 
 
-
-    def find_ids_by_artist(artist_query: str):
-        if not artist_query:
-            return []
-
-        found_matches = id_information_df[
-            id_information_df["artist"].str.contains(
-                artist_query,  # string of search text
-                case = False,  # False for case-insensitive, True for case-sensitive
-                na = False,  #  ignore NaN values
-                regex = False  # for . or *
-            )
-        ]
-        return found_matches["id"].tolist()
-
-    def find_ids_by_song(song_query: str):
-        if not song_query:
-            return []
-
-        found_matches = id_information_df[
-            id_information_df["song"].str.contains(
-                song_query,  # string of search text
-                case = False,  # False for case-insensitive, True for case-sensitive
-                na = False,  #  ignore NaN values
-                regex = False  # for . or *
-            )
-        ]
-        return found_matches["id"].tolist()
-
-    def find_ids_by_album(album_query: str):
-        if not album_query:
-            return []
-
-        found_matches = id_information_df[
-            id_information_df["album_name"].str.contains(
-                album_query,  # string of search text
-                case = False,  # False for case-insensitive, True for case-sensitive
-                na = False,  #  ignore NaN values
-                regex = False  # for . or *
-            )
-        ]
-        return found_matches["id"].tolist()
-
-
-    def find_ids(query:str, column:str):
+    def find_id(query:str, column:str):
         if not query:
-            return []
+            return None
         found_matches = id_information_df[
             id_information_df[column].str.contains(
                 query,  # string of search text
@@ -180,20 +151,38 @@ def main(page: ft.Page):
                 regex = False  # for . or *
             )
         ]
-        return found_matches["id"].tolist()
+        if found_matches.empty:
+            return None
+       # return found_matches["id"].tolist()
+        return found_matches.iloc[0]["id"]
 
     def resolve_unimode_query_id(artist, song, album_name):
-        if song:
-            id = find_ids(song, "song")
-            if id: return id
-        if artist:
-            id = find_ids(artist, "artist")
-            if id: return id
-        if album_name:
-            id = find_ids(album_name, "album_name")
-            if id: return id
-        return []
-
+    #    if song:
+    #        id = find_ids(song, "song")
+    #        if id: return id
+    #    if artist:
+    #        id = find_ids(artist, "artist")
+    #        if id: return id
+    #    if album_name:
+    #        id = find_ids(album_name, "album_name")
+    #        if id: return id
+    #    return []
+        search_order = [
+            (song, "song"),
+            (artist, "artist"),
+            (album_name, "album_name")
+        ]
+        for query, column in search_order:
+            query_id = find_id(query, column)
+            if query_id:
+                return query_id
+    #        if query_id:
+    #            return query_id
+    #        if query:
+    #            id = find_ids(query, column)
+    #            if id:
+    #                return id[0]
+        return None
 
     search_song_field = create_search_field(
         hint_text="Find song by title",
@@ -265,13 +254,13 @@ def main(page: ft.Page):
         label_style=ft.TextStyle(color=ft.Colors.WHITE),
         text_style=ft.TextStyle(color=ft.Colors.WHITE),
         hint_text="choose an Algorithm",
-        value="A",  # start value
+        value=RetrievalAlgorithms.RANDOM,  # start value
         options=[
-            ft.dropdown.Option("random", "Random baseline"),
-            ft.dropdown.Option("unimodal", "Unimodal"),
-            ft.dropdown.Option("multi_early", "Multimodal - Early fusion"),
-            ft.dropdown.Option("multi_late", "Multimodal - Late fusion"),
-            ft.dropdown.Option("neural", "Neural-Network based")
+            ft.dropdown.Option(RetrievalAlgorithms.RANDOM.value, "Random baseline"),
+            ft.dropdown.Option(RetrievalAlgorithms.UNIMODAL.value, "Unimodal"),
+            ft.dropdown.Option(RetrievalAlgorithms.EARLY_FUSION.value, "Multimodal - Early fusion"),
+            ft.dropdown.Option(RetrievalAlgorithms.LATE_FUSION.value, "Multimodal - Late fusion"),
+            ft.dropdown.Option(RetrievalAlgorithms.NEUTRAL_NETWORK.value, "Neural-Network based")
         ],
         on_change=handle_dropdown_menu,
         col={"xs": 12, "sm": 6, "md": 4},
