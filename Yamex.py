@@ -16,6 +16,7 @@ DATA_ROOT = "./data"
 id_information_df = pd.read_csv(f"{DATA_ROOT}/id_information_mmsr.tsv", sep="\t")
 
 unimodal_rs = UnimodalRetrievalSystem(data_root=DATA_ROOT)
+current_slider_value = 10 # default value
 
 def main(page: ft.Page):
     page.padding = 20
@@ -78,16 +79,13 @@ def main(page: ft.Page):
         # TODO call song album search (print is only placeholder)
         print("search by album progress")
 
-    slider_label = ft.Text("Number of results:", color=ft.Colors.WHITE)
+    slider_label = ft.Text(f"Number of results: {current_slider_value}", color=ft.Colors.WHITE)
 
     def handle_slider(e: ft.ControlEvent):
         global current_slider_value
         current_slider_value = int(e.control.value)
         slider_label.value = f" Number of results: {current_slider_value}"
         page.update()
-
-    current_slider_value = 10  # default value
-    slider_label = ft.Text(f"Number of results: {current_slider_value}", color=ft.Colors.WHITE)
 
     def handle_dropdown_menu(e):
         global current_algorithm
@@ -153,20 +151,9 @@ def main(page: ft.Page):
         ]
         if found_matches.empty:
             return None
-       # return found_matches["id"].tolist()
         return found_matches.iloc[0]["id"]
 
     def resolve_unimode_query_id(artist, song, album_name):
-    #    if song:
-    #        id = find_ids(song, "song")
-    #        if id: return id
-    #    if artist:
-    #        id = find_ids(artist, "artist")
-    #        if id: return id
-    #    if album_name:
-    #        id = find_ids(album_name, "album_name")
-    #        if id: return id
-    #    return []
         search_order = [
             (song, "song"),
             (artist, "artist"),
@@ -176,12 +163,6 @@ def main(page: ft.Page):
             query_id = find_id(query, column)
             if query_id:
                 return query_id
-    #        if query_id:
-    #            return query_id
-    #        if query:
-    #            id = find_ids(query, column)
-    #            if id:
-    #                return id[0]
         return None
 
     search_song_field = create_search_field(
