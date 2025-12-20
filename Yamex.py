@@ -17,6 +17,7 @@ id_information_df = pd.read_csv(f"{DATA_ROOT}/id_information_mmsr.tsv", sep="\t"
 
 unimodal_rs = UnimodalRetrievalSystem(data_root=DATA_ROOT)
 current_slider_value = 10 # default value
+retrieved_results = []
 
 def main(page: ft.Page):
     page.padding = 20
@@ -66,19 +67,6 @@ def main(page: ft.Page):
         expand=True
     )
 
-    # functions for search fields
-    def handle_search_title(query: str):
-        # TODO call song title search (print is only placeholder)
-        print("search by title in progress")
-
-    def handle_search_artist(query: str):
-        # TODO call song artist search (print is only placeholder)
-        print("search by artist progress")
-
-    def handle_search_album(query: str):
-        # TODO call song album search (print is only placeholder)
-        print("search by album progress")
-
     slider_label = ft.Text(f"Number of results: {current_slider_value}", color=ft.Colors.WHITE)
 
     def handle_slider(e: ft.ControlEvent):
@@ -94,7 +82,8 @@ def main(page: ft.Page):
         page.update()
 
     def create_search_field(
-        hint_text: str = "",
+        hint_text: str = "Search for a song title, an artist or an album",
+        expand=False,
         on_submit_callback=None
     ):
         return ft. TextField(
@@ -102,39 +91,38 @@ def main(page: ft.Page):
             bgcolor=ft.Colors.DEEP_PURPLE_50,
             border_radius=20,
             prefix_icon=ft.Icons.SEARCH_ROUNDED,
-            col = {"xs": 12, "sm": 6, "md": 4},
+            expand=False,
             on_submit = lambda e: on_submit_callback(e.control.value)
                 if on_submit_callback else None
         )
 
     def handle_search_now(e):
-        song_query = search_song_field.value.split()
-        artist_query = search_artist_field.value.strip()
-        album_query = search_album_field.value.strip()
-        current_algorithm = dropdown_algorithm.value
+        query = search_field.value.strip()
         current_number_results = current_slider_value
 
-        results_song.controls.clear()
+        result_songs.controls.clear()
+        query_id = resolve_unimode_query_id(query)
 
-        # query_id = "04OjszRi9rC5BlHC"
-        query_id = resolve_unimode_query_id(
-            song=song_query,
-            artist=artist_query,
-            album_name=album_query
-        )
         if current_algorithm == RetrievalAlgorithms.UNIMODAL:
             ids, scores = unimodal_rs.retrieve(
                 query_id =  query_id,
                 modality = "audio",
                 k_neighbors = current_number_results
             )
-        print(f"Query: Artist: {artist_query}, Algorithm: {current_algorithm}, Number of results: {current_number_results}")
+        print(f"Query: {query}, Algorithm: {current_algorithm}, Number of results: {current_number_results}")
 
-        for i, id in enumerate(ids):
-            results_song.controls.append(
-                ft.Text(f"[{i+1}] {id}", color=ft.Colors.WHITE)
+        global retrieved_results
+        for retrieved_id, score in zip(ids, scores):
+            retrieved_results.append({
+                "id": retrieved_id,
+                "score": score,
+            })
+
+        for i, retrieved_id in enumerate(ids):
+            result_songs.controls.append(
+                ft.Text(f"[{i+1}] {retrieved_id}", color=ft.Colors.WHITE)
             )
-
+        print (f"retrieved: {retrieved_results}")
         page.update()
 
 
@@ -153,63 +141,17 @@ def main(page: ft.Page):
             return None
         return found_matches.iloc[0]["id"]
 
-    def resolve_unimode_query_id(artist, song, album_name):
-        search_order = [
-            (song, "song"),
-            (artist, "artist"),
-            (album_name, "album_name")
-        ]
-        for query, column in search_order:
+    def resolve_unimode_query_id(query):
+        search_order = ["song", "artist", "album_name"]
+
+        for column in search_order:
             query_id = find_id(query, column)
             if query_id:
                 return query_id
         return None
 
-    search_song_field = create_search_field(
-        hint_text="Find song by title",
-        on_submit_callback=handle_search_title
-    )
 
-    search_artist_field = create_search_field(
-        hint_text="Find songs of an artist",
-        on_submit_callback=handle_search_artist
-    )
-
-    search_album_field = create_search_field(
-        hint_text="Find songs of an album",
-        on_submit_callback=handle_search_album
-    )
-
-    create_search_title = ft.Column(
-        col={"xs": 12, "sm": 6, "md": 4},
-        controls=[
-            ft.Text("Song:"),
-            search_song_field
-        ]
-    )
-
-    create_search_artist = ft.Column(
-        col={"xs": 12, "sm": 6, "md": 4},
-        controls=[
-            ft.Text("Artist:"),
-            search_artist_field
-        ]
-    )
-
-    create_search_album = ft.Column(
-        col={"xs": 12, "sm": 6, "md": 4},
-        controls=[
-            ft.Text("Album:"),
-            search_album_field
-        ]
-    )
-
-    search_fields = ft.ResponsiveRow(
-        controls=[
-            create_search_title,
-            create_search_artist,
-            create_search_album,
-        ],
+    search_field = create_search_field(
     )
 
     results_slider = ft.Slider(
@@ -217,24 +159,22 @@ def main(page: ft.Page):
         max=100,
         divisions=20,  # for step size of 5
         value=current_slider_value,
-        label="",
+#        label="{value}",
         on_change=handle_slider,
-        col={"xs": 12, "sm": 6, "md": 4},
+        expand=True
     )
 
-    slider_group = ft.Column(
+    slider_group = ft.Row(
         controls=[
             slider_label,
             results_slider
-        ],
-        col={"xs": 12, "sm": 6, "md": 4}
+        ]
     )
 
     dropdown_algorithm = ft.Dropdown(
         label="Algorithm",
         label_style=ft.TextStyle(color=ft.Colors.WHITE),
         text_style=ft.TextStyle(color=ft.Colors.WHITE),
-        hint_text="choose an Algorithm",
         value=RetrievalAlgorithms.RANDOM,  # start value
         options=[
             ft.dropdown.Option(RetrievalAlgorithms.RANDOM.value, "Random baseline"),
@@ -244,7 +184,6 @@ def main(page: ft.Page):
             ft.dropdown.Option(RetrievalAlgorithms.NEUTRAL_NETWORK.value, "Neural-Network based")
         ],
         on_change=handle_dropdown_menu,
-        col={"xs": 12, "sm": 6, "md": 4},
         border_radius=20,
         bgcolor=ft.Colors.DEEP_PURPLE_700,
         border_color=ft.Colors.DEEP_PURPLE_200,
@@ -268,49 +207,52 @@ def main(page: ft.Page):
             ),
             padding=ft.padding.symmetric(horizontal=20, vertical=20),
         ),
-        col={"xs": 6, "sm": 3, "md": 2},
+        col={"xs": 8, "sm": 4, "md": 3},
     )
 
 
     control_row = ft.ResponsiveRow(
         controls=[
-            slider_group,
-            search_button,
-            dropdown_algorithm,
+            ft.Container(
+                content=search_field,
+                alignment=ft.alignment.center_right,
+                col={"xs": 12, "md": 6},
+            ),
+            ft.Container(
+                content=dropdown_algorithm,
+                alignment=ft.alignment.center_left,
+                col={"xs": 12, "md": 2},
+            ),
+            ft.Container(
+                content=slider_group,
+                alignment=ft.alignment.center_left,
+                col={"xs": 12, "md": 4},
+            )
         ],
-        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+        width=float("inf"),
         spacing=20
     )
 
-    dummy_songs = [
-        "Dummy song A - Artist 1, Album Z, 2025",
-        "Dummy song B - Artist 2, Album Y, 1983",
-        "Dummy song C - Artist 3, Album X, 2023",
-        "Dummy song D - Artist 4, Album W, 1993",
-        "Dummy song E - Artist 3, Album V, 2021",
-        "Dummy song F - Artist 1, Album U, 2003",
-        "Dummy song G - Artist 5, Album T, 2010",
-        "Dummy song H - Artist 6, Album S 1999",
-        "Dummy song I - Artist 7, Album R, 2024",
-        "Dummy song J - Artist 8, Album Q, 1978",
-    ]
+    result_songs = ft.Column(scroll="auto", expand=True)
+    for i, result in enumerate(retrieved_results):
+        row = id_information_df[id_information_df["id"] == result["id"]].iloc[0]
 
-    # dummy results
-    results_song = ft.Column(scroll="auto", expand=True)
+        output_text = (
+            f"[{i + 1}] {row['song']} – {row['artist']}, ({row['album_name']}) | score: {result['score']:.3f}"
+        )
 
-    # initial songs for demo
-    results_song.controls.append(ft.Text("initial results for demo:", color=ft.Colors.WHITE))
-    for song in dummy_songs:
-         results_song.controls.append(ft.Text(song, color=ft.Colors.WHITE))
+        result_songs.controls.append(
+            ft.Text(output_text, color=ft.Colors.WHITE)
+        )
 
     intermediate_results_container = ft.Container(
-        content=results_song,
+        content=result_songs,
         padding=15,
         border=ft.border.all(1, ft.Colors.DEEP_PURPLE_200),
         border_radius=20,
         expand=True,
         alignment=ft.alignment.top_left,
-        col={"xs": 12, "md": 6}  # xs = small monitor: voll width, md = medium = 6 of 12 colums width
+        col={"xs": 12, "md": 6}  # xs = small monitor: full width, md = medium = 6 of 12 colums width
     )
 
     result_container = ft.Container(
@@ -336,8 +278,8 @@ def main(page: ft.Page):
         ft.Column(
             controls=[
                 title,
-                search_fields,
                 control_row,
+                search_button,
                 ft.Text("Top results:"),
                 result_row
             ],
