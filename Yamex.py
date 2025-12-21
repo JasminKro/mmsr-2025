@@ -17,6 +17,7 @@ id_information_df = pd.read_csv(f"{DATA_ROOT}/id_information_mmsr.tsv", sep="\t"
 
 unimodal_rs = UnimodalRetrievalSystem(data_root=DATA_ROOT)
 current_slider_value = 10 # default value
+current_algorithm = RetrievalAlgorithms.RANDOM
 retrieved_results = []
 
 def main(page: ft.Page):
@@ -99,9 +100,16 @@ def main(page: ft.Page):
     def handle_search_now(e):
         query = search_field.value.strip()
         current_number_results = current_slider_value
-
         result_songs.controls.clear()
+        retrieved_results.clear()
         query_id = resolve_unimode_query_id(query)
+
+        if not query_id:
+            result_songs.controls.append(
+                ft.Text("Sorry, no results found", color=ft.Colors.WHITE)
+            )
+            page.update()
+            return
 
         if current_algorithm == RetrievalAlgorithms.UNIMODAL:
             ids, scores = unimodal_rs.retrieve(
@@ -109,19 +117,44 @@ def main(page: ft.Page):
                 modality = "audio",
                 k_neighbors = current_number_results
             )
-        print(f"Query: {query}, Algorithm: {current_algorithm}, Number of results: {current_number_results}")
 
-        global retrieved_results
-        for retrieved_id, score in zip(ids, scores):
-            retrieved_results.append({
+        for i, (retrieved_id, score) in enumerate(zip(ids, scores)):
+            res_row = id_information_df[id_information_df["id"] == retrieved_id]
+            if res_row.empty: continue
+            res = res_row.iloc[0]
+
+            r = {
+                "index": i + 1,  # running number
                 "id": retrieved_id,
                 "score": score,
-            })
+                "song": res["song"],
+                "artist": res["artist"],
+                "album_name": res["album_name"]
+            }
+            retrieved_results.append(r)
 
-        for i, retrieved_id in enumerate(ids):
             result_songs.controls.append(
-                ft.Text(f"[{i+1}] {retrieved_id}", color=ft.Colors.WHITE)
+                ft.ListTile(
+                    title=ft.Text(
+                        spans=[
+                            ft.TextSpan(
+                                f"[{r['index']}] ",
+                                ft.TextStyle(color=ft.Colors.WHITE)
+                            ),
+                            ft.TextSpan(
+                                r['song'],
+                                ft.TextStyle(color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD)
+                            ),
+                            ft.TextSpan(
+                                f" - {r['artist']}, {r['album_name']} "
+                                f" score: {r['score']:.3f}",
+                                ft.TextStyle(color=ft.Colors.WHITE)
+                            )
+                        ]
+                    ),
+                    on_click = lambda e, song=r: on_song_click(song)
             )
+        )
         print (f"retrieved: {retrieved_results}")
         page.update()
 
@@ -149,6 +182,9 @@ def main(page: ft.Page):
             if query_id:
                 return query_id
         return None
+
+    def on_song_click(song_data):
+        print("Clicked: ", song_data)
 
 
     search_field = create_search_field(
@@ -234,16 +270,6 @@ def main(page: ft.Page):
     )
 
     result_songs = ft.Column(scroll="auto", expand=True)
-    for i, result in enumerate(retrieved_results):
-        row = id_information_df[id_information_df["id"] == result["id"]].iloc[0]
-
-        output_text = (
-            f"[{i + 1}] {row['song']} – {row['artist']}, ({row['album_name']}) | score: {result['score']:.3f}"
-        )
-
-        result_songs.controls.append(
-            ft.Text(output_text, color=ft.Colors.WHITE)
-        )
 
     intermediate_results_container = ft.Container(
         content=result_songs,
