@@ -135,6 +135,7 @@ def main(page: ft.Page):
 
             result_songs.controls.append(
                 ft.ListTile(
+                    hover_color=ft.Colors.DEEP_PURPLE_800,
                     title=ft.Text(
                         spans=[
                             ft.TextSpan(
@@ -143,11 +144,11 @@ def main(page: ft.Page):
                             ),
                             ft.TextSpan(
                                 r['song'],
-                                ft.TextStyle(color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD)
+                                ft.TextStyle(color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD, size=18)
                             ),
                             ft.TextSpan(
                                 f" - {r['artist']}, {r['album_name']} "
-                                f" score: {r['score']:.3f}",
+                                f"  |  score: {r['score']:.3f}",
                                 ft.TextStyle(color=ft.Colors.WHITE)
                             )
                         ]
