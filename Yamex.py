@@ -117,6 +117,7 @@ def main(page: ft.Page):
                 modality = "audio",
                 k_neighbors = current_number_results
             )
+            print(f"query_id: {query_id}")
 
         for i, (retrieved_id, score) in enumerate(zip(ids, scores)):
             res_row = id_information_df[id_information_df["id"] == retrieved_id]
