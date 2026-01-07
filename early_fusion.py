@@ -4,7 +4,8 @@ import numpy as np
 from numpy.linalg import norm
 from sklearn.decomposition import PCA
 
-from unimodal import *
+from unimodal import UnimodalRetrievalSystem
+from common import Evaluator, CACHE_DIR
 
 
 AUDIO_DIM = 768
@@ -15,12 +16,12 @@ PROJ_DIM = 1024
 
 class EarlyFusionRetrievalSystem(UnimodalRetrievalSystem):
 
-    def __init__(self, data_root):
+    def __init__(self, data_root, evaluator):
 
         self.data_root = data_root
-        self.cache_dir = "./cache"
-        self.fused_features_path = os.path.join(self.cache_dir, "fused_features.npz")
-        self.id_mapping_path = os.path.join(self.cache_dir, "id_mapping.json")
+        self.evaluator = evaluator
+        self.fused_features_path = os.path.join(CACHE_DIR, "fused_features.npz")
+        self.id_mapping_path = os.path.join(CACHE_DIR, "id_mapping.json")
 
         if not (os.path.isfile(self.fused_features_path) and os.path.isfile(self.id_mapping_path)):
             print("cache not found | preprocessing features and building cache")
@@ -31,19 +32,9 @@ class EarlyFusionRetrievalSystem(UnimodalRetrievalSystem):
     def _build_cache(self):
 
         # Collect feature matrices of all modalities
-        all_features = []
-        id_mapping = None
-
-        for modality in MODALITIES:
-            # Load raw (unnormalized) features for current modality 
-            features, _, id_to_index = self._process_data(modality, normalize=False) 
-            all_features.append(features)
-            # Use audio as the reference ordering for all modalities
-            if modality == "audio":
-                id_mapping = id_to_index
-
+        features, _, id_mapping = self._load_features(normalize=False)
         # Early fusion: concatenate all modalities along the feature dimension
-        features_fused = np.concatenate(all_features, axis=1)
+        features_fused = np.concatenate(list(features.values()), axis=1)
 
         # Drop constant features to avoid division by zero (since std will be 0)
         std = features_fused.std(axis=0)
@@ -55,14 +46,14 @@ class EarlyFusionRetrievalSystem(UnimodalRetrievalSystem):
         features_fused = (features_fused - mean) / std 
 
         # Project fused features to a lower dimensional space using PCA
-        pca = PCA(n_components=PROJ_DIM, random_state=0)
-        features_fused = pca.fit_transform(features_fused)
+        # pca = PCA(n_components=PROJ_DIM, random_state=0)
+        # features_fused = pca.fit_transform(features_fused)
 
         # Normalized feature vectors (make each vector unit length)
         features_fused = features_fused / norm(features_fused, axis=1).reshape(-1, 1)
 
         # Cache fused features to avoid recomputation in the future
-        os.makedirs(self.cache_dir, exist_ok=True)
+        os.makedirs(CACHE_DIR, exist_ok=True)
         np.savez(self.fused_features_path, features=features_fused)
 
         # Cache the id mapping
@@ -78,14 +69,20 @@ class EarlyFusionRetrievalSystem(UnimodalRetrievalSystem):
         self.index_to_id = [None] * len(self.id_to_index)
         for id, idx in self.id_to_index.items():
             self.index_to_id[idx] = id
-
-    def retrieve(self, query_id, k_neighbors):
-        return self._retrieve(query_id, k_neighbors, self.features, self.id_to_index, self.index_to_id)
+    
+    def rankings(self, query_id):
+        features = self.features
+        query_index = self.id_to_index[query_id]  # convert id to index
+        query_vector = features[query_index]  # fetch query vector
+        return features @ query_vector  # compute cosine similarities to all other vectors
 
 
 if __name__ == "__main__":
-    
-    early_fusion_rs = EarlyFusionRetrievalSystem("./data")
-    ids, scores = early_fusion_rs.retrieve(query_id="NDroPROgWm3jBxjH", k_neighbors=5)
+
+    data_root = "./data"
+    evaluator = Evaluator(data_root)
+    early_fusion_rs = EarlyFusionRetrievalSystem(data_root, evaluator)
+
+    ids, metrics = early_fusion_rs.retrieve(query_id="NDroPROgWm3jBxjH", k_neighbors=5)  # returns metrics dictionary instead of cosine similarity list
     print("ids:", ids)
-    print("scores:", scores)
+    print("metrics:", metrics)
