@@ -1,8 +1,10 @@
 import flet as ft
 import pandas as pd
 
-from unimodal import UnimodalRetrievalSystem
 from enum import Enum
+
+from strategies import RandomStrategy, UnimodalStrategy
+from unimodal import UnimodalRetrievalSystem, Evaluator
 
 class RetrievalAlgorithms(str, Enum):
     RANDOM = "random"
@@ -15,7 +17,8 @@ class RetrievalAlgorithms(str, Enum):
 DATA_ROOT = "./data"
 id_information_df = pd.read_csv(f"{DATA_ROOT}/id_information_mmsr.tsv", sep="\t")
 
-unimodal_rs = UnimodalRetrievalSystem(data_root=DATA_ROOT)
+evaluator = Evaluator(DATA_ROOT)
+unimodal_rs = UnimodalRetrievalSystem(DATA_ROOT, evaluator)
 current_slider_value = 10 # default value
 current_algorithm = RetrievalAlgorithms.RANDOM
 retrieved_results = []
@@ -51,7 +54,6 @@ def main(page: ft.Page):
             thumb_color=ft.Colors.DEEP_PURPLE_300,
         )
     )
-
 
     # title
     title = ft.Text(
@@ -99,94 +101,81 @@ def main(page: ft.Page):
 
     def handle_search_now(e):
         query = search_field.value.strip()
-        current_number_results = current_slider_value
-        result_songs.controls.clear()
-        retrieved_results.clear()
         query_id = resolve_unimode_query_id(query)
 
+        result_songs.controls.clear()
+
         if not query_id:
-            result_songs.controls.append(
-                ft.Text("Sorry, no results found", color=ft.Colors.WHITE)
-            )
+            result_songs.controls.append(ft.Text("No results found for that query.", color="red"))
             page.update()
             return
 
-        if current_algorithm == RetrievalAlgorithms.UNIMODAL:
-            ids, scores = unimodal_rs.retrieve(
-                query_id =  query_id,
-                modality = "audio",
-                k_neighbors = current_number_results
-            )
-            print(f"query_id: {query_id}")
+        # Select the strategy based on the dropdown value
+        selected_algo_key = dropdown_algorithm.value
+        strategy = strategies.get(selected_algo_key)
 
-        for i, (retrieved_id, score) in enumerate(zip(ids, scores)):
-            res_row = id_information_df[id_information_df["id"] == retrieved_id]
+        if not strategy:
+            result_songs.controls.append(ft.Text("Algorithm not yet implemented.", color="yellow"))
+            page.update()
+            return
+
+        # EXECUTE SEARCH
+        ids, scores = strategy.search(query_id, current_slider_value)
+
+        # UPDATE UI
+        retrieved_results.clear()
+        for i, (ret_id, score) in enumerate(zip(ids, scores)):
+            res_row = id_information_df[id_information_df["id"] == ret_id]
             if res_row.empty: continue
             res = res_row.iloc[0]
 
-            r = {
-                "index": i + 1,  # running number
-                "id": retrieved_id,
+            song_info = {
+                "index": i + 1,
+                "id": ret_id,
                 "score": score,
                 "song": res["song"],
                 "artist": res["artist"],
                 "album_name": res["album_name"]
             }
-            retrieved_results.append(r)
+            retrieved_results.append(song_info)
 
             result_songs.controls.append(
                 ft.ListTile(
-                    hover_color=ft.Colors.DEEP_PURPLE_800,
-                    title=ft.Text(
-                        spans=[
-                            ft.TextSpan(
-                                f"[{r['index']}] ",
-                                ft.TextStyle(color=ft.Colors.WHITE)
-                            ),
-                            ft.TextSpan(
-                                r['song'],
-                                ft.TextStyle(color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD, size=18)
-                            ),
-                            ft.TextSpan(
-                                f" - {r['artist']}, {r['album_name']} "
-                                f"  |  score: {r['score']:.3f}",
-                                ft.TextStyle(color=ft.Colors.WHITE)
-                            )
-                        ]
-                    ),
-                    on_click = lambda e, song=r: on_song_click(song)
+                    leading=ft.Text(f"[{song_info['index']}]", color="white70", size=14),
+                    title=ft.Text(f"{song_info['song']}", color="white", weight="bold"),
+                    subtitle=ft.Text(f"{song_info['artist']}, {song_info['album_name']} | Score: {score:.3f}", color="white70"),
+                    on_click=lambda e, s=song_info: on_song_click(s)
+                )
             )
-        )
-        print (f"retrieved: {retrieved_results}")
         page.update()
 
-
-    def find_id(query:str, column:str):
-        if not query:
-            return None
-        found_matches = id_information_df[
-            id_information_df[column].str.contains(
-                query,  # string of search text
-                case = False,  # False for case-insensitive, True for case-sensitive
-                na = False,  #  ignore NaN values
-                regex = False  # for . or *
-            )
-        ]
-        if found_matches.empty:
-            return None
-        return found_matches.iloc[0]["id"]
+    def find_id(query: str, column: str):
+        found = id_information_df[id_information_df[column].str.contains(query, case=False, na=False, regex=False)]
+        return found.iloc[0]["id"] if not found.empty else None
 
     def resolve_unimode_query_id(query):
-        search_order = ["song", "artist", "album_name"]
-
-        for column in search_order:
-            query_id = find_id(query, column)
-            if query_id:
-                return query_id
+        for col in ["song", "artist", "album_name"]:
+            qid = find_id(query, col)
+            if qid: return qid
         return None
 
+    strategies = {
+        RetrievalAlgorithms.RANDOM: RandomStrategy(id_information_df["id"].tolist()),
+        RetrievalAlgorithms.UNIMODAL: UnimodalStrategy(unimodal_rs),
+    }
+
+
+
     def on_song_click(song_data):
-        print("Clicked: ", song_data)
+        # Update the details container with info from the clicked song
+        result_container.content = ft.Column([
+            ft.Text(f"Title: {song_data['song']}", size=20, weight="bold"),
+            ft.Text(f"Artist: {song_data['artist']}"),
+            ft.Text(f"Album: {song_data['album_name']}"),
+            ft.Text(f"Score: {song_data['score']:.4f}"),
+            ft.Text(f"ID: {song_data['id']}", size=12, color="grey"),
+        ])
+        page.update()
 
 
     search_field = create_search_field(
