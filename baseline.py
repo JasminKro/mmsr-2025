@@ -1,61 +1,35 @@
 import numpy as np
-import pandas as pd
+from common import Evaluator, evaluate_system
 
 
 class RandomBaselineRetrievalSystem:
     """
-    Random baseline: regardless of the query track, this system randomly
-
+    Random baseline:
+      - rankings(query_id) -> random scores for all tracks (length N)
     """
 
-    def __init__(self, data_root):
-        """
-        Loads a global list of all track IDs.
-        """
-        # any file that contains all track ids works
-        df = pd.read_csv(f"{data_root}/id_information_mmsr.tsv", sep="\t")
-        self.all_ids = df["id"].tolist()
+    def __init__(self, evaluator, seed=0):
+        self.evaluator = evaluator
+        self.rng = np.random.default_rng(seed=seed)
 
+    def rankings(self, query_id):
+        return self.rng.uniform(-1.0, 1.0, size=(len(self.evaluator.ids),))
+
+    # optional convenience 
     def retrieve(self, query_id, k_neighbors):
-        """
-        Returns:
-            ids: list of randomly selected track IDs
-            scores: random scores in [0, 1)
-        """
-        if query_id not in self.all_ids:
-            raise ValueError(f"Query id {query_id} not found in dataset.")
-
-        if k_neighbors <= 0:
-            raise ValueError("k_neighbors must be > 0")
-        
-        # remove query track
-        candidate_ids = [tid for tid in self.all_ids if tid != query_id]
-
-        if k_neighbors > len(candidate_ids):
-            raise ValueError(
-                f"k_neighbors ({k_neighbors}) is larger than "
-                f"available candidates ({len(candidate_ids)})"
-            )
-
-        # random sample without replacement
-        sampled_ids = np.random.choice(
-            candidate_ids,
-            size=k_neighbors,
-            replace=False
-        ).tolist()
-
-        # random scores 
-        random_scores = np.random.rand(k_neighbors).tolist()
-
-        return sampled_ids, random_scores
+        scores = self.rankings(query_id)
+        top_idx = np.argsort(scores)[::-1][:k_neighbors + 1]
+        top_ids = [self.evaluator.ids[i] for i in top_idx if self.evaluator.ids[i] != query_id][:k_neighbors]
+        top_scores = [float(scores[self.evaluator.id_to_idx[tid]]) if hasattr(self.evaluator, "id_to_idx") else float(scores[i])
+                      for i, tid in zip(top_idx, [self.evaluator.ids[i] for i in top_idx]) if tid != query_id][:k_neighbors]
+        return top_ids, top_scores
 
 
 if __name__ == "__main__":
     data_root = "./data"
-    query_id = "NDroPROgWm3jBxjH"
+    evaluator = Evaluator(data_root)
 
-    rs = RandomBaselineRetrievalSystem(data_root)
-    ids, scores = rs.retrieve(query_id=query_id, k_neighbors=5)
+    rs = RandomBaselineRetrievalSystem(evaluator, seed=0)
 
-    print("Random baseline ids:", ids)
-    print("Random baseline scores:", scores)
+    print("\n=== RANDOM BASELINE EVALUATION ===")
+    evaluate_system(evaluator, rs, k=10)
