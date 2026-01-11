@@ -5,7 +5,7 @@ from numpy.linalg import norm
 from sklearn.decomposition import PCA
 
 from unimodal import UnimodalRetrievalSystem
-from common import Evaluator, CACHE_DIR
+from common import Evaluator, CACHE_DIR, evaluate_system
 
 
 AUDIO_DIM = 768
@@ -83,6 +83,12 @@ if __name__ == "__main__":
     evaluator = Evaluator(data_root)
     early_fusion_rs = EarlyFusionRetrievalSystem(data_root, evaluator)
 
-    ids, metrics = early_fusion_rs.retrieve(query_id="NDroPROgWm3jBxjH", k_neighbors=5)  # returns metrics dictionary instead of cosine similarity list
-    print("ids:", ids)
-    print("metrics:", metrics)
+    #ids, metrics = early_fusion_rs.retrieve(query_id="NDroPROgWm3jBxjH", k_neighbors=5)  # returns metrics dictionary instead of cosine similarity list
+    #print("ids:", ids)
+    #print("metrics:", metrics)
+
+    k = 10
+
+    print("\n" + "=" * 60)
+    print("Early Fusion")
+    evaluate_system(evaluator, early_fusion_rs, k=k)

@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from numpy.linalg import norm
 
-from common import Evaluator, DATAFRAMES, MODALITIES
+from common import Evaluator, DATAFRAMES, MODALITIES, evaluate_system
 
 
 class UnimodalRetrievalSystem:
@@ -69,8 +69,19 @@ if __name__ == "__main__":
     data_root = "./data"
     evaluator = Evaluator(data_root)
     unimodal_rs = UnimodalRetrievalSystem(data_root, evaluator)
-    unimodal_rs.set_modality("audio")  # new method added
+    #unimodal_rs.set_modality("audio")  # new method added
 
-    ids, metrics = unimodal_rs.retrieve(query_id="NDroPROgWm3jBxjH", k_neighbors=5)  # `modality` argument removed; returns metrics dictionary instead of cosine similarity list
-    print("ids:", ids)
-    print("metrics:", metrics)
+    #ids, metrics = unimodal_rs.retrieve(query_id="NDroPROgWm3jBxjH", k_neighbors=5)  # `modality` argument removed; returns metrics dictionary instead of cosine similarity list
+    #print("ids:", ids)
+    #print("metrics:", metrics)
+
+    k = 10
+
+    for modality in ["audio", "lyrics", "video"]:
+        print("\n" + "=" * 60)
+        print(f"Unimodal {modality}")
+        unimodal_rs.set_modality(modality)
+        evaluate_system(evaluator, unimodal_rs, k=k)
+
+
+
