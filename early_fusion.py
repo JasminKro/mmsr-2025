@@ -5,34 +5,39 @@ from numpy.linalg import norm
 from sklearn.decomposition import PCA
 
 from unimodal import UnimodalRetrievalSystem
-from common import Evaluator, CACHE_DIR, evaluate_system
+from common import Evaluator, CACHE_DIR, MODALITIES, evaluate_system
 
 
 AUDIO_DIM = 768
 LYRICS_DIM = 500
 VIDEO_DIM = 4096*2
-PROJ_DIM = 1024
+PROJ_DIM = 512
 
 
 class EarlyFusionRetrievalSystem(UnimodalRetrievalSystem):
 
-    def __init__(self, data_root, evaluator):
+    def __init__(self, data_root, evaluator, modalities, use_pca=False):
 
         self.data_root = data_root
         self.evaluator = evaluator
+        self.use_pca = use_pca  # PCA is disabled by default because it has a negligible impact on performance
         self.fused_features_path = os.path.join(CACHE_DIR, "fused_features.npz")
         self.id_mapping_path = os.path.join(CACHE_DIR, "id_mapping.json")
 
-        if not (os.path.isfile(self.fused_features_path) and os.path.isfile(self.id_mapping_path)):
-            print("cache not found | preprocessing features and building cache")
-            self._build_cache()
-        
-        self._load_cache()
+        for modality in modalities:
+            assert modality in MODALITIES, "invalid modality: " + modality
 
-    def _build_cache(self):
+        try:
+            self._load_cache(modalities)
+        except:
+            print("loading...")
+            self._build_cache(modalities)
+            self._load_cache(modalities)
+
+    def _build_cache(self, modalities):
 
         # Collect feature matrices of all modalities
-        features, _, id_mapping = self._load_features(normalize=False)
+        features, _, id_mapping = self._load_features(modalities, normalize=False)
         # Early fusion: concatenate all modalities along the feature dimension
         features_fused = np.concatenate(list(features.values()), axis=1)
 
@@ -46,22 +51,36 @@ class EarlyFusionRetrievalSystem(UnimodalRetrievalSystem):
         features_fused = (features_fused - mean) / std 
 
         # Project fused features to a lower dimensional space using PCA
-        # pca = PCA(n_components=PROJ_DIM, random_state=0)
-        # features_fused = pca.fit_transform(features_fused)
+        if self.use_pca:
+            pca = PCA(n_components=PROJ_DIM, random_state=0)
+            features_fused = pca.fit_transform(features_fused)
 
         # Normalized feature vectors (make each vector unit length)
         features_fused = features_fused / norm(features_fused, axis=1).reshape(-1, 1)
 
         # Cache fused features to avoid recomputation in the future
         os.makedirs(CACHE_DIR, exist_ok=True)
-        np.savez(self.fused_features_path, features=features_fused)
+        np.savez(
+            self.fused_features_path,
+            features=features_fused,
+            modalities=modalities,
+            use_pca=self.use_pca
+        )
 
         # Cache the id mapping
         with open(self.id_mapping_path, "w") as f:
             json.dump(id_mapping, f)
 
-    def _load_cache(self):
-        self.features = np.load(self.fused_features_path)["features"]
+    def _load_cache(self, modalities):
+        cache_file = np.load(self.fused_features_path)
+        modalities_cached = cache_file["modalities"]
+        use_pca_cached = cache_file["use_pca"]
+        if not (
+            np.all(np.array(modalities) == modalities_cached) and
+            self.use_pca == use_pca_cached
+        ):
+            raise ValueError("Cached feature configuration does not match the requested configuration")
+        self.features = cache_file["features"]
         with open(self.id_mapping_path, "r") as f:
             self.id_to_index = json.load(f)
 
@@ -81,7 +100,11 @@ if __name__ == "__main__":
 
     data_root = "./data"
     evaluator = Evaluator(data_root)
-    early_fusion_rs = EarlyFusionRetrievalSystem(data_root, evaluator)
+    early_fusion_rs = EarlyFusionRetrievalSystem(
+        data_root=data_root,
+        evaluator=evaluator,
+        modalities=["audio", "lyrics", "video"]
+    )
 
     #ids, metrics = early_fusion_rs.retrieve(query_id="NDroPROgWm3jBxjH", k_neighbors=5)  # returns metrics dictionary instead of cosine similarity list
     #print("ids:", ids)

@@ -12,7 +12,8 @@ class UnimodalRetrievalSystem:
 
         self.data_root = data_root
         self.evaluator = evaluator
-        self.features, self.index_to_id, self.id_to_index = self._load_features()
+        print("loading...")
+        self.features, self.index_to_id, self.id_to_index = self._load_features(MODALITIES)
         self.modality = None
 
     def _load_dataframe(self, modality):
@@ -20,13 +21,13 @@ class UnimodalRetrievalSystem:
         df = pd.read_csv(os.path.join(self.data_root, filename), sep="\t")
         return df, start_column
 
-    def _load_features(self, normalize=True):
+    def _load_features(self, modalities, normalize=True):
         # Load audio dataframe to use its ID order as the reference and
         df_audio, _ = self._load_dataframe("audio")
         ref_order = df_audio["id"]
 
         features = {}
-        for modality in MODALITIES:
+        for modality in modalities:
             df, start_column = self._load_dataframe(modality)
             df = df.set_index("id").reindex(ref_order).reset_index()  # reorder current modality to exactly match the reference ID order 
             features_matrix = df.loc[:, start_column:].to_numpy()     # convert feature vectors to numpy array
