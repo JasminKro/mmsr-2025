@@ -141,7 +141,6 @@ def main(page: ft.Page):
             song_info = {
                 "index": i + 1,
                 "id": ret_id,
-                "score": score,
                 "song": res["song"],
                 "artist": res["artist"],
                 "album_name": res["album_name"],
@@ -153,7 +152,7 @@ def main(page: ft.Page):
                 ft.ListTile(
                     leading=ft.Text(f"[{song_info['index']}]", color="white70", size=14),
                     title=ft.Text(f"{song_info['song']}", color="white", weight=ft.FontWeight.BOLD),
-                    subtitle=ft.Text(f"{song_info['artist']}, {song_info['album_name']} | Score: {score:.3f}", color="white70"),
+                    subtitle=ft.Text(f"{song_info['artist']}, {song_info['album_name']}", color="white70"),
                     on_click=lambda e, s=song_info: on_song_click(s)
                 )
             )
@@ -190,13 +189,12 @@ def main(page: ft.Page):
             ft.Text(f"Title: {song_data['song']}", size=20, weight=ft.FontWeight.BOLD),
             ft.Text(f"Artist: {song_data['artist']}"),
             ft.Text(f"Album: {song_data['album_name']}"),
-            ft.Text(f"Score: {song_data['score']:.4f}"),
             ft.Text(f"ID: {song_data['id']}", size=12, color="grey"),
             ft.Divider(height=20, color="transparent"),
 
             # The Video Player
             # TODO
-                ft.Text(f"ID: {song_data['id']}", size=12, color="grey"),
+                ft.Text(f"URL: {song_data['url']}", size=20, color="grey"),
             ], scroll=ft.ScrollMode.AUTO)
         page.update()
     search_field = create_search_field(
