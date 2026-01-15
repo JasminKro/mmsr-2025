@@ -1,9 +1,18 @@
 import flet as ft
+import flet_video as fv
 import pandas as pd
 
 from enum import Enum
+
+from flet import UrlLauncher
+
 from strategies import RandomStrategy, UnimodalStrategy
 from unimodal import UnimodalRetrievalSystem, Evaluator
+
+# create a real HTML <iframe> element in the browser."
+def register_iframe():
+    import flet.fastapi as flet_fastapi # If using flet-fastapi
+    # On standard Flet, we use the page.page_id or specific web-registry
 
 class RetrievalAlgorithms(str, Enum):
     RANDOM = "random"
@@ -34,7 +43,7 @@ current_slider_value = 10 # default value
 current_algorithm = RetrievalAlgorithms.RANDOM
 retrieved_results = []
 
-def main(page: ft.Page):
+async def main(page: ft.Page):
     page.scroll = ft.ScrollMode.AUTO
     page.padding = 20
     page.bgcolor = ft.Colors.DEEP_PURPLE_900
@@ -198,32 +207,56 @@ def main(page: ft.Page):
                 ft.Container(
                     content=ft.Text(g.strip(), color=ft.Colors.WHITE),
                     bgcolor=ft.Colors.DEEP_PURPLE_700,
-                    padding=ft.padding.symmetric(horizontal=10, vertical=5),
+                    padding=ft.Padding(10,5,10,5),
                     border_radius=15,
                     border=ft.Border.all(1, ft.Colors.DEEP_PURPLE_200),
                ) for g in str(clean_genres).split(",") if g.strip() and g.strip().lower() != "nan"
             ],
         )
 
-        # Convert standard YouTube link to Embed link
-        embed_url = ""
+       # 1. Transform the URL (Crucial for iframe security)
         if "youtube.com" in video_url:
             video_id = video_url.split("v=")[-1].split("&")[0] if "v=" in video_url else video_url.split("/")[-1]
             embed_url = f"https://www.youtube.com/embed/{video_id}"
+        else:
+            embed_url = video_url
+
+        video_player = fv.Video(
+            expand=True,
+            playlist=[fv.VideoMedia(embed_url)],
+            aspect_ratio=16 / 9,
+            autoplay=False,
+            # essential for Linux:
+            show_controls=True,
+        )
+
+        async def handle_open_link(e):
+            await UrlLauncher().launch_url(video_url)
 
         # Update the details container with info from the clicked song
         result_container.content = ft.Column([
             ft.Text(f"Title: {song_data['song']}", size=20, weight=ft.FontWeight.BOLD),
             ft.Text(f"Artist: {song_data['artist']}"),
             ft.Text(f"Album: {song_data['album_name']}"),
-            ft.Text(f"ID: {song_data['id']}", size=12, color="grey"),
-            ft.Divider(height=20, color="transparent"),
+#            ft.Text(f"ID: {song_data['id']}", size=12, color="grey"),
+            ft.Divider(height=1, color="transparent"),
             ft.Text("Genres:" ),
             genre_chips,
-            ft.Divider(height=20, color="transparent"),
+            ft.Divider(height=1, color="transparent"),
             # The Video Player
-            # TODO
-                ft.Text(f"URL: {song_data['url']}", size=20, color="grey"),
+            ft.Container(
+                content=video_player,
+                border=ft.Border.all(1, ft.Colors.DEEP_PURPLE_200),
+                border_radius=10,
+                padding=10,
+            ),
+            # Add a direct link button as a backup
+            ft.Button(
+                content=ft.Text("Open Video in New Tab"),
+                icon=ft.Icons.OPEN_IN_NEW,
+                on_click=handle_open_link
+            ),
+#            ft.Text(f"URL: {song_data['url']}", size=12, color="grey"),
             ], scroll=ft.ScrollMode.AUTO)
         page.update()
     search_field = create_search_field(on_submit_callback=handle_search_now)
@@ -282,7 +315,6 @@ def main(page: ft.Page):
                 color=ft.Colors.DEEP_PURPLE_200,
                 width=1
             ),
-            # Padding in ButtonStyle also uses the Padding class
             padding=ft.Padding(20, 20, 20, 20),
         ),
         col={"xs": 8, "sm": 4, "md": 3},
@@ -359,7 +391,5 @@ def main(page: ft.Page):
         )
     )
 
-
-ft.app(target=main, view=ft.AppView.WEB_BROWSER)  # to run Yamex in PyCharm
-# ft.app(target=main) # to run Yamex in terminal go saved directory and use command: flet run --web Yamex.py
-# ft.run(main) # alternative for opening a window
+ft.run(main)  # open YAMEx in a separate window
+#ft.run(main, view=ft.AppView.WEB_BROWSER) # opens YAMEx in browser
