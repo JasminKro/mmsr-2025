@@ -1,0 +1,7 @@
+app_name: "YAMEx"
+description: "Yet Another Music Explorer"
+executable_name: "yamex"
+
+# This ensures your data files are bundled inside the app!
+assets:
+  - data/
