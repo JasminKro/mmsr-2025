@@ -15,12 +15,18 @@ class RetrievalAlgorithms(str, Enum):
 
 DATA_ROOT = "./data"
 id_information_df = pd.read_csv(f"{DATA_ROOT}/id_information_mmsr.tsv", sep="\t")
+id_genres_df = pd.read_csv(f"{DATA_ROOT}/id_genres_mmsr.tsv", sep="\t")
 id_url_df = pd.read_csv(f"{DATA_ROOT}/id_url_mmsr.tsv", sep="\t")
 
+# data frame containing: 'id', 'artist', 'song', 'album_name', 'url', 'genres'
+master_df = (id_information_df
+               .merge(id_url_df, on="id", how="left")
+               .merge(id_genres_df, on="id", how="left")
+)
+#print(master_df.head(10).to_string())
 
-# Lookup dictionary
-# This maps 'id' -> {'song': ..., 'artist': ..., 'album_name': ..., 'url': ...}
-song_lookup_dict = id_information_df.merge(id_url_df, on="id", how="left").set_index("id").to_dict("index")
+# convert data framt to dictionary
+song_lookup_dict = master_df.set_index("id").to_dict("index")
 
 evaluator = Evaluator(DATA_ROOT)
 unimodal_rs = UnimodalRetrievalSystem(DATA_ROOT, evaluator)
@@ -98,7 +104,7 @@ def main(page: ft.Page):
         return ft. TextField(
             hint_text=hint_text,
             hint_style=ft.TextStyle(color=ft.Colors.DEEP_PURPLE_800),
-            bgcolor=ft.Colors.DEEP_PURPLE_50,
+            bgcolor=ft.Colors.WHITE,
             border_radius=20,
             color=ft.Colors.BLACK,
             prefix_icon=ft.Icon(ft.Icons.SEARCH_ROUNDED, color=ft.Colors.DEEP_PURPLE_800),
@@ -107,7 +113,7 @@ def main(page: ft.Page):
                 if on_submit_callback else None
         )
 
-    def handle_search_now(e):
+    def handle_search_now(e=None):
         query = search_field.value.strip()
         query_id = resolve_unimode_query_id(query)
 
@@ -144,7 +150,8 @@ def main(page: ft.Page):
                 "song": res["song"],
                 "artist": res["artist"],
                 "album_name": res["album_name"],
-                "url": res["url"]
+                "url": res["url"],
+                "genres": res.get("genre", "N/A")
             }
             retrieved_results.append(song_info)
 
@@ -163,20 +170,40 @@ def main(page: ft.Page):
         return found.iloc[0]["id"] if not found.empty else None
 
     def resolve_unimode_query_id(query):
-        for col in ["song", "artist", "album_name"]:
-            qid = find_id(query, col)
-            if qid: return qid
-        return None
+        query = query.lower()
+        # Search across song, artist, and album_name simultaneously
+        mask = (
+                master_df["song"].str.contains(query, case=False, na=False) |
+                master_df["artist"].str.contains(query, case=False, na=False) |
+                master_df["album_name"].str.contains(query, case=False, na=False)
+        )
+        found = master_df[mask]
+        return found.iloc[0]["id"] if not found.empty else None
+
 
     strategies = {
         RetrievalAlgorithms.RANDOM: RandomStrategy(id_information_df["id"].tolist()),
         RetrievalAlgorithms.UNIMODAL: UnimodalStrategy(unimodal_rs),
     }
 
-
-
     def on_song_click(song_data):
         video_url = song_data.get("url", "")
+        genres_raw = song_data.get("genres", "No genres listed")
+        clean_genres = str(genres_raw).strip("[]").replace("'", "").replace('"', '')
+
+        genre_chips = ft.Row(
+            wrap=True,
+            spacing=5,
+            controls=[
+                ft.Container(
+                    content=ft.Text(g.strip(), color=ft.Colors.WHITE),
+                    bgcolor=ft.Colors.DEEP_PURPLE_700,
+                    padding=ft.padding.symmetric(horizontal=10, vertical=5),
+                    border_radius=15,
+                    border=ft.Border.all(1, ft.Colors.DEEP_PURPLE_200),
+               ) for g in str(clean_genres).split(",") if g.strip() and g.strip().lower() != "nan"
+            ],
+        )
 
         # Convert standard YouTube link to Embed link
         embed_url = ""
@@ -191,14 +218,15 @@ def main(page: ft.Page):
             ft.Text(f"Album: {song_data['album_name']}"),
             ft.Text(f"ID: {song_data['id']}", size=12, color="grey"),
             ft.Divider(height=20, color="transparent"),
-
+            ft.Text("Genres:" ),
+            genre_chips,
+            ft.Divider(height=20, color="transparent"),
             # The Video Player
             # TODO
                 ft.Text(f"URL: {song_data['url']}", size=20, color="grey"),
             ], scroll=ft.ScrollMode.AUTO)
         page.update()
-    search_field = create_search_field(
-    )
+    search_field = create_search_field(on_submit_callback=handle_search_now)
 
     results_slider = ft.Slider(
         min=1,
