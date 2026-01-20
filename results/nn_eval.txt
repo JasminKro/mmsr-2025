@@ -1,0 +1,232 @@
+============================================================
+Neural Network audio-audio
+Evaluating NeuralNetworkBasedRetrievalSystem: 100%|███████████████████████████████| 4148/4148 [00:17<00:00, 241.38track/s]
+
+JACCARD-THRESHOLD RELEVANCE
+METRIC       MEAN   |  STD
+-----------------------------
+Precision@10: 0.0462 | 0.0781
+Recall@10:    0.0024 | 0.0085
+MRR@10:       0.1061 | 0.2208
+nDCG@10:      0.1014 | 0.0799
+
+OVERLAP RELEVANCE (slide rule)
+METRIC       MEAN   |  STD
+-----------------------------
+Precision@10: 0.4178 | 0.2721
+Recall@10:    0.0024 | 0.0023
+MRR@10:       0.5718 | 0.3876
+nDCG@10:      0.4164 | 0.2792
+
+POPULARITY
+METRIC            MEAN   |  STD
+--------------------------------
+Pop@10 (log1p): 7.8995 | 0.4167
+loading...
+
+============================================================
+Neural Network audio-lyrics
+Evaluating NeuralNetworkBasedRetrievalSystem: 100%|███████████████████████████████| 4148/4148 [00:14<00:00, 294.01track/s]
+
+JACCARD-THRESHOLD RELEVANCE
+METRIC       MEAN   |  STD
+-----------------------------
+Precision@10: 0.0424 | 0.0750
+Recall@10:    0.0023 | 0.0071
+MRR@10:       0.1047 | 0.2201
+nDCG@10:      0.0980 | 0.0642
+
+OVERLAP RELEVANCE (slide rule)
+METRIC       MEAN   |  STD
+-----------------------------
+Precision@10: 0.3826 | 0.2513
+Recall@10:    0.0020 | 0.0018
+MRR@10:       0.5585 | 0.4034
+nDCG@10:      0.4084 | 0.2386
+
+POPULARITY
+METRIC            MEAN   |  STD
+--------------------------------
+Pop@10 (log1p): 8.0363 | 0.3096
+loading...
+
+============================================================
+Neural Network audio-video
+Evaluating NeuralNetworkBasedRetrievalSystem: 100%|███████████████████████████████| 4148/4148 [00:17<00:00, 242.34track/s]
+
+JACCARD-THRESHOLD RELEVANCE
+METRIC       MEAN   |  STD
+-----------------------------
+Precision@10: 0.0401 | 0.0726
+Recall@10:    0.0020 | 0.0056
+MRR@10:       0.0986 | 0.2181
+nDCG@10:      0.0999 | 0.0816
+
+OVERLAP RELEVANCE (slide rule)
+METRIC       MEAN   |  STD
+-----------------------------
+Precision@10: 0.4408 | 0.2766
+Recall@10:    0.0025 | 0.0024
+MRR@10:       0.5683 | 0.3859
+nDCG@10:      0.4359 | 0.2873
+
+POPULARITY
+METRIC            MEAN   |  STD
+--------------------------------
+Pop@10 (log1p): 8.0794 | 0.2640
+loading...
+
+============================================================
+Neural Network lyrics-audio
+Evaluating NeuralNetworkBasedRetrievalSystem: 100%|███████████████████████████████| 4148/4148 [00:14<00:00, 285.35track/s]
+
+JACCARD-THRESHOLD RELEVANCE
+METRIC       MEAN   |  STD
+-----------------------------
+Precision@10: 0.0445 | 0.0708
+Recall@10:    0.0029 | 0.0183
+MRR@10:       0.1309 | 0.2715
+nDCG@10:      0.0964 | 0.0727
+
+OVERLAP RELEVANCE (slide rule)
+METRIC       MEAN   |  STD
+-----------------------------
+Precision@10: 0.4257 | 0.2466
+Recall@10:    0.0024 | 0.0027
+MRR@10:       0.5416 | 0.3954
+nDCG@10:      0.3930 | 0.2424
+
+POPULARITY
+METRIC            MEAN   |  STD
+--------------------------------
+Pop@10 (log1p): 8.4609 | 0.0587
+loading...
+
+============================================================
+Neural Network lyrics-lyrics
+Evaluating NeuralNetworkBasedRetrievalSystem: 100%|███████████████████████████████| 4148/4148 [00:17<00:00, 240.52track/s]
+
+JACCARD-THRESHOLD RELEVANCE
+METRIC       MEAN   |  STD
+-----------------------------
+Precision@10: 0.0465 | 0.0785
+Recall@10:    0.0022 | 0.0056
+MRR@10:       0.1083 | 0.2228
+nDCG@10:      0.1016 | 0.0797
+
+OVERLAP RELEVANCE (slide rule)
+METRIC       MEAN   |  STD
+-----------------------------
+Precision@10: 0.4223 | 0.2737
+Recall@10:    0.0024 | 0.0018
+MRR@10:       0.5720 | 0.3872
+nDCG@10:      0.4204 | 0.2805
+
+POPULARITY
+METRIC            MEAN   |  STD
+--------------------------------
+Pop@10 (log1p): 7.8963 | 0.4047
+loading...
+
+============================================================
+Neural Network lyrics-video
+Evaluating NeuralNetworkBasedRetrievalSystem: 100%|███████████████████████████████| 4148/4148 [00:17<00:00, 238.28track/s]
+
+JACCARD-THRESHOLD RELEVANCE
+METRIC       MEAN   |  STD
+-----------------------------
+Precision@10: 0.0622 | 0.0865
+Recall@10:    0.0031 | 0.0080
+MRR@10:       0.0945 | 0.1345
+nDCG@10:      0.0927 | 0.0667
+
+OVERLAP RELEVANCE (slide rule)
+METRIC       MEAN   |  STD
+-----------------------------
+Precision@10: 0.3759 | 0.2352
+Recall@10:    0.0020 | 0.0012
+MRR@10:       0.3071 | 0.1887
+nDCG@10:      0.3216 | 0.2005
+
+POPULARITY
+METRIC            MEAN   |  STD
+--------------------------------
+Pop@10 (log1p): 7.8855 | 0.1032
+loading...
+
+============================================================
+Neural Network video-audio
+Evaluating NeuralNetworkBasedRetrievalSystem: 100%|███████████████████████████████| 4148/4148 [00:17<00:00, 242.55track/s]
+
+JACCARD-THRESHOLD RELEVANCE
+METRIC       MEAN   |  STD
+-----------------------------
+Precision@10: 0.0546 | 0.0849
+Recall@10:    0.0026 | 0.0056
+MRR@10:       0.1359 | 0.2519
+nDCG@10:      0.1221 | 0.0898
+
+OVERLAP RELEVANCE (slide rule)
+METRIC       MEAN   |  STD
+-----------------------------
+Precision@10: 0.4822 | 0.2787
+Recall@10:    0.0028 | 0.0020
+MRR@10:       0.6518 | 0.3825
+nDCG@10:      0.4878 | 0.2872
+
+POPULARITY
+METRIC            MEAN   |  STD
+--------------------------------
+Pop@10 (log1p): 7.8015 | 0.3807
+loading...
+
+============================================================
+Neural Network video-lyrics
+Evaluating NeuralNetworkBasedRetrievalSystem: 100%|███████████████████████████████| 4148/4148 [00:17<00:00, 240.19track/s]
+
+JACCARD-THRESHOLD RELEVANCE
+METRIC       MEAN   |  STD
+-----------------------------
+Precision@10: 0.0444 | 0.0717
+Recall@10:    0.0026 | 0.0103
+MRR@10:       0.1162 | 0.2361
+nDCG@10:      0.1030 | 0.0716
+
+OVERLAP RELEVANCE (slide rule)
+METRIC       MEAN   |  STD
+-----------------------------
+Precision@10: 0.4155 | 0.2615
+Recall@10:    0.0024 | 0.0036
+MRR@10:       0.6303 | 0.3887
+nDCG@10:      0.4309 | 0.2709
+
+POPULARITY
+METRIC            MEAN   |  STD
+--------------------------------
+Pop@10 (log1p): 8.0319 | 0.3405
+loading...
+
+============================================================
+Neural Network video-video
+Evaluating NeuralNetworkBasedRetrievalSystem: 100%|███████████████████████████████| 4148/4148 [00:17<00:00, 240.98track/s]
+
+JACCARD-THRESHOLD RELEVANCE
+METRIC       MEAN   |  STD
+-----------------------------
+Precision@10: 0.0456 | 0.0747
+Recall@10:    0.0023 | 0.0053
+MRR@10:       0.1103 | 0.2233
+nDCG@10:      0.1021 | 0.0809
+
+OVERLAP RELEVANCE (slide rule)
+METRIC       MEAN   |  STD
+-----------------------------
+Precision@10: 0.4201 | 0.2755
+Recall@10:    0.0024 | 0.0033
+MRR@10:       0.5734 | 0.3871
+nDCG@10:      0.4197 | 0.2827
+
+POPULARITY
+METRIC            MEAN   |  STD
+--------------------------------
+Pop@10 (log1p): 7.8817 | 0.4207

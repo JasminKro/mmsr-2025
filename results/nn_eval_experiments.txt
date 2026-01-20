@@ -1,0 +1,154 @@
+============================================================
+Neural Network Experiment <1>
+Evaluating NeuralNetworkBasedRetrievalSystemExperimental: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████| 4148/4148 [00:17<00:00, 240.09track/s]
+
+JACCARD-THRESHOLD RELEVANCE
+METRIC       MEAN   |  STD
+-----------------------------
+Precision@10: 0.0940 | 0.1308
+Recall@10:    0.0059 | 0.0120
+MRR@10:       0.2098 | 0.3171
+nDCG@10:      0.1574 | 0.1102
+
+OVERLAP RELEVANCE (slide rule)
+METRIC       MEAN   |  STD
+-----------------------------
+Precision@10: 0.5574 | 0.3059
+Recall@10:    0.0039 | 0.0047
+MRR@10:       0.6910 | 0.3711
+nDCG@10:      0.5586 | 0.3113
+
+POPULARITY
+METRIC            MEAN   |  STD
+--------------------------------
+Pop@10 (log1p): 7.9049 | 0.4927
+loading...
+
+============================================================
+Neural Network Experiment <2>
+Evaluating NeuralNetworkBasedRetrievalSystemExperimental: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████| 4148/4148 [00:17<00:00, 241.58track/s]
+
+JACCARD-THRESHOLD RELEVANCE
+METRIC       MEAN   |  STD
+-----------------------------
+Precision@10: 0.0881 | 0.1256
+Recall@10:    0.0058 | 0.0160
+MRR@10:       0.1883 | 0.2925
+nDCG@10:      0.1527 | 0.1084
+
+OVERLAP RELEVANCE (slide rule)
+METRIC       MEAN   |  STD
+-----------------------------
+Precision@10: 0.5480 | 0.3030
+Recall@10:    0.0038 | 0.0051
+MRR@10:       0.6826 | 0.3725
+nDCG@10:      0.5486 | 0.3083
+
+POPULARITY
+METRIC            MEAN   |  STD
+--------------------------------
+Pop@10 (log1p): 7.9137 | 0.5176
+loading...
+
+============================================================
+Neural Network Experiment <3>
+Evaluating NeuralNetworkBasedRetrievalSystemExperimental: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████| 4148/4148 [00:17<00:00, 240.42track/s]
+
+JACCARD-THRESHOLD RELEVANCE
+METRIC       MEAN   |  STD
+-----------------------------
+Precision@10: 0.0940 | 0.1308
+Recall@10:    0.0059 | 0.0120
+MRR@10:       0.2098 | 0.3171
+nDCG@10:      0.1574 | 0.1102
+
+OVERLAP RELEVANCE (slide rule)
+METRIC       MEAN   |  STD
+-----------------------------
+Precision@10: 0.5574 | 0.3059
+Recall@10:    0.0039 | 0.0047
+MRR@10:       0.6910 | 0.3711
+nDCG@10:      0.5586 | 0.3113
+
+POPULARITY
+METRIC            MEAN   |  STD
+--------------------------------
+Pop@10 (log1p): 7.9049 | 0.4927
+loading...
+
+============================================================
+Neural Network Experiment <4>
+Evaluating NeuralNetworkBasedRetrievalSystemExperimental: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████| 4148/4148 [00:17<00:00, 236.72track/s]
+
+JACCARD-THRESHOLD RELEVANCE
+METRIC       MEAN   |  STD
+-----------------------------
+Precision@10: 0.0999 | 0.1283
+Recall@10:    0.0069 | 0.0211
+MRR@10:       0.2181 | 0.3157
+nDCG@10:      0.1637 | 0.1094
+
+OVERLAP RELEVANCE (slide rule)
+METRIC       MEAN   |  STD
+-----------------------------
+Precision@10: 0.5691 | 0.3013
+Recall@10:    0.0041 | 0.0097
+MRR@10:       0.7080 | 0.3664
+nDCG@10:      0.5709 | 0.3054
+
+POPULARITY
+METRIC            MEAN   |  STD
+--------------------------------
+Pop@10 (log1p): 7.9211 | 0.5134
+loading...
+
+============================================================
+Neural Network Experiment <5>
+Evaluating NeuralNetworkBasedRetrievalSystemExperimental: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████| 4148/4148 [00:17<00:00, 238.00track/s]
+
+JACCARD-THRESHOLD RELEVANCE
+METRIC       MEAN   |  STD
+-----------------------------
+Precision@10: 0.0927 | 0.1290
+Recall@10:    0.0060 | 0.0138
+MRR@10:       0.1966 | 0.3003
+nDCG@10:      0.1534 | 0.1090
+
+OVERLAP RELEVANCE (slide rule)
+METRIC       MEAN   |  STD
+-----------------------------
+Precision@10: 0.5476 | 0.3063
+Recall@10:    0.0038 | 0.0044
+MRR@10:       0.6733 | 0.3767
+nDCG@10:      0.5470 | 0.3123
+
+POPULARITY
+METRIC            MEAN   |  STD
+--------------------------------
+Pop@10 (log1p): 7.9057 | 0.4964
+loading...
+
+============================================================
+Neural Network Experiment <6>
+Evaluating NeuralNetworkBasedRetrievalSystemExperimental: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████| 4148/4148 [00:17<00:00, 238.40track/s]
+
+JACCARD-THRESHOLD RELEVANCE
+METRIC       MEAN   |  STD
+-----------------------------
+Precision@10: 0.0852 | 0.1178
+Recall@10:    0.0056 | 0.0242
+MRR@10:       0.1904 | 0.3010
+nDCG@10:      0.1512 | 0.1051
+
+OVERLAP RELEVANCE (slide rule)
+METRIC       MEAN   |  STD
+-----------------------------
+Precision@10: 0.5406 | 0.3023
+Recall@10:    0.0039 | 0.0162
+MRR@10:       0.6861 | 0.3746
+nDCG@10:      0.5437 | 0.3079
+
+POPULARITY
+METRIC            MEAN   |  STD
+--------------------------------
+Pop@10 (log1p): 7.8957 | 0.5155

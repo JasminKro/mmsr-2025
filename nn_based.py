@@ -22,16 +22,22 @@ class NeuralNetworkBasedRetrievalSystem:
 
         self.data_root = data_root
         self.evaluator = evaluator
-        self.query_modality = query_modality
-        self.result_modality = result_modality
 
         print("loading...")
-        self.f1, self.f2, self.index_to_id, self.id_to_index = self._load_data()
+        ref_df_path = os.path.join(self.data_root, "lyrics_bert_lyrics_bert_padding", "f1_lyrics_bert_f2_lyrics_bert_padding", "f1_lyrics_bert.tsv")
+        ref_order = pd.read_csv(ref_df_path, sep="\t")["id"]
+        self.index_to_id = ref_order.to_list() # index-to-id list
+        self.id_to_index = dict(zip(self.index_to_id, range(len(self.index_to_id))))  # id-to-index map
 
-    def _load_data(self):
-        
-        desc1 = MODALITY_DESC[self.query_modality]
-        desc2 = MODALITY_DESC[self.result_modality]
+        f1, f2 = self._load_data(query_modality, result_modality, ref_order)
+        f1, f2 = self._preprocess_data(f1, f2)
+        self.f1 = f1
+        self.f2 = f2
+
+    def _load_data(self, query_modality, result_modality, ref_order):
+
+        desc1 = MODALITY_DESC[query_modality]
+        desc2 = MODALITY_DESC[result_modality]
 
         # Assume primary order
         used1, used2 = desc1, desc2
@@ -45,10 +51,12 @@ class NeuralNetworkBasedRetrievalSystem:
             filename1, filename2 = f"f2_{used1}.tsv", f"f1_{used1}.tsv"
 
         # Load feature vectors
-        ref_df_path = os.path.join(self.data_root, "lyrics_bert_lyrics_bert_padding", "f1_lyrics_bert_f2_lyrics_bert_padding", "f1_lyrics_bert.tsv")
-        ref_order = pd.read_csv(ref_df_path, sep="\t")["id"]
         f1 = pd.read_csv(os.path.join(folder_path, filename1), sep="\t").set_index("id").reindex(ref_order).to_numpy()
         f2 = pd.read_csv(os.path.join(folder_path, filename2), sep="\t").set_index("id").reindex(ref_order).to_numpy()
+
+        return f1, f2
+
+    def _preprocess_data(self, f1, f2):
 
         # Normalize vectors (avoid division-by-zero)
         n1 = norm(f1, axis=1).reshape(-1, 1)
@@ -59,13 +67,7 @@ class NeuralNetworkBasedRetrievalSystem:
         n2[n2 == 0] = 1.0
         f2 = f2 / n2
 
-        index_to_id = ref_order.to_list() # index-to-id list
-        id_to_index = dict(zip(index_to_id, range(len(index_to_id))))  # id-to-index map
-
-        return f1, f2, index_to_id, id_to_index
-
-    def _load_features(self):
-        pass
+        return f1, f2
 
     def rankings(self, query_id):
         query_features = self.f1
@@ -91,6 +93,41 @@ class NeuralNetworkBasedRetrievalSystem:
         return top_ids, metrics
     
 
+
+class NeuralNetworkBasedRetrievalSystemExperiments(NeuralNetworkBasedRetrievalSystem):
+
+    def __init__(self, data_root, evaluator, experiment_num):
+
+        assert 1 <= experiment_num <= 6
+
+        self.data_root = data_root
+        self.evaluator = evaluator
+
+        print("loading...")
+        f1, f2 = self._load_data(experiment_num)
+        f1, f2 = self._preprocess_data(f1, f2)
+        self.f1 = f1
+        self.f2 = f2
+
+    
+    def _load_data(self, experiment_num):
+
+        folder_path = os.path.join(self.data_root, str(experiment_num))
+        filename1, filename2 = "f1_mfcc_bow.tsv", "f2_mfcc_bow.tsv"
+
+        # Load feature vectors
+        df1 = pd.read_csv(os.path.join(folder_path, filename1), sep="\t")
+        df2 = pd.read_csv(os.path.join(folder_path, filename2), sep="\t")
+        f1 = df1.set_index("id").to_numpy()
+        f2 = df2.set_index("id").to_numpy()
+
+        self.index_to_id = df1["id"].to_list() # index-to-id list
+        self.id_to_index = dict(zip(self.index_to_id, range(len(self.index_to_id))))  # id-to-index map
+
+        return f1, f2
+
+
+
 if __name__ == "__main__":
 
     evaluator = Evaluator("./data")
@@ -100,6 +137,11 @@ if __name__ == "__main__":
     #     query_modality="audio",
     #     result_modality="audio"
     # )
+    # nn_rs = NeuralNetworkBasedRetrievalSystemExperimental(
+    #     data_root="./data_nn/NN_experiments/",
+    #     evaluator=evaluator,
+    #     experiment_num=1
+    # )
 
     # ids, metrics = nn_rs.retrieve(query_id="NDroPROgWm3jBxjH", k_neighbors=5)  # `modality` argument removed; returns metrics dictionary instead of cosine similarity list
     # print("ids:", ids)
@@ -108,14 +150,22 @@ if __name__ == "__main__":
     k = 10
     for query_modality in ["audio", "lyrics", "video"]:
         for result_modality in ["audio", "lyrics", "video"]:
-
             nn_rs = NeuralNetworkBasedRetrievalSystem(
                 data_root="./data_nn/NN_pretrained_models_and_features/",
                 evaluator=evaluator,
                 query_modality=query_modality,
                 result_modality=result_modality
             )
-
             print("\n" + "=" * 60)
             print(f"Neural Network {query_modality}-{result_modality}")
             evaluate_system(evaluator, nn_rs, k=k)
+
+    for experiment_num in range(1, 7):
+        nn_rs = NeuralNetworkBasedRetrievalSystemExperiments(
+            data_root="./data_nn/NN_experiments/",
+            evaluator=evaluator,
+            experiment_num=experiment_num
+        )
+        print("\n" + "=" * 60)
+        print(f"Neural Network Experiment <{experiment_num}>")
+        evaluate_system(evaluator, nn_rs, k=k)
