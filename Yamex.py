@@ -16,7 +16,9 @@ def register_iframe():
 
 class RetrievalAlgorithms(str, Enum):
     RANDOM = "random"
-    UNIMODAL = "unimodal"
+    UNIMODAL_AUDIO = "unimodal audio"
+    UNIMODAL_LYRIC = "unimodal lyrics"
+    UNIMODAL_VIDEO = "unimodal video"
     EARLY_FUSION = "early_fusion"
     LATE_FUSION = "late_fusion"
     NEUTRAL_NETWORK = "neutral_network"
@@ -192,7 +194,9 @@ async def main(page: ft.Page):
 
     strategies = {
         RetrievalAlgorithms.RANDOM: RandomStrategy(id_information_df["id"].tolist()),
-        RetrievalAlgorithms.UNIMODAL: UnimodalStrategy(unimodal_rs),
+        RetrievalAlgorithms.UNIMODAL_AUDIO: UnimodalStrategy(unimodal_rs, "audio"),
+        RetrievalAlgorithms.UNIMODAL_LYRIC: UnimodalStrategy(unimodal_rs, "lyrics"),
+        RetrievalAlgorithms.UNIMODAL_VIDEO: UnimodalStrategy(unimodal_rs, "video"),
     }
 
     def on_song_click(song_data):
@@ -285,7 +289,9 @@ async def main(page: ft.Page):
         value=RetrievalAlgorithms.RANDOM,  # start value
         options=[
             ft.dropdown.Option(RetrievalAlgorithms.RANDOM.value, "Random baseline"),
-            ft.dropdown.Option(RetrievalAlgorithms.UNIMODAL.value, "Unimodal"),
+            ft.dropdown.Option(RetrievalAlgorithms.UNIMODAL_AUDIO.value, "Unimodal Audio"),
+            ft.dropdown.Option(RetrievalAlgorithms.UNIMODAL_LYRIC.value, "Unimodal Lyrics"),
+            ft.dropdown.Option(RetrievalAlgorithms.UNIMODAL_VIDEO.value, "Unimodal Videoclips"),
             ft.dropdown.Option(RetrievalAlgorithms.EARLY_FUSION.value, "Multimodal - Early fusion"),
             ft.dropdown.Option(RetrievalAlgorithms.LATE_FUSION.value, "Multimodal - Late fusion"),
             ft.dropdown.Option(RetrievalAlgorithms.NEUTRAL_NETWORK.value, "Neural-Network based")

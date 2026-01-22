@@ -20,12 +20,12 @@ class RandomStrategy(RetrievalStrategy):
 
 
 class UnimodalStrategy(RetrievalStrategy):
-    def __init__(self, rs_instance):
+    def __init__(self, rs_instance, modality):
         self.rs = rs_instance
+        self.modality = modality
 
     def search(self, query_id, k):
-        # set modality first
-        self.rs.set_modality("audio")
+        self.rs.set_modality(self.modality)
         ids, metrics = self.rs.retrieve(query_id=query_id, k_neighbors=k)
 
         # Extract scores from the metrics dictionary
