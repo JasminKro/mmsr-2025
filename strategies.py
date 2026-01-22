@@ -61,7 +61,19 @@ class EarlyFusionStrategy(RetrievalStrategy):
         self.modalities = modalities
 
     def search(self, query_id, k):
-   #     self.rs.set_modality(self.modalities)
+        ids, metrics = self.rs.retrieve(query_id=query_id, k_neighbors=k)
+
+        # Extract scores from the metrics dictionary
+        # We use .get() as a fallback in case 'cosine_sim' isn't the key
+        scores = metrics.get("cosine_sim", [0.0] * len(ids))
+        return ids, scores
+
+class LateFusionStrategy(RetrievalStrategy):
+    def __init__(self, rs_instance, modalities):
+        self.rs = rs_instance
+        self.modalities = modalities
+
+    def search(self, query_id, k):
         ids, metrics = self.rs.retrieve(query_id=query_id, k_neighbors=k)
 
         # Extract scores from the metrics dictionary

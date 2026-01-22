@@ -6,9 +6,10 @@ from enum import Enum
 
 from flet import UrlLauncher
 
-from strategies import EarlyFusionStrategy, RandomStrategy, UnimodalStrategy
+from strategies import EarlyFusionStrategy, LateFusionStrategy, RandomStrategy, UnimodalStrategy
 from unimodal import UnimodalRetrievalSystem, Evaluator
 from early_fusion import EarlyFusionRetrievalSystem
+from late_fusion import LateFusionRetrievalSystem
 
 class RetrievalAlgorithms(str, Enum):
     RANDOM = "random"
@@ -58,15 +59,17 @@ unimodal_rs = UnimodalRetrievalSystem(DATA_ROOT, evaluator)
 # Early Fusion Pre-Initialization of all combinations
 # it takes long to load at starting program, but it enables a quick search for user
 EARLY_FUSION_SYSTEMS = {}
+LATE_FUSION_SYSTEMS = {}
 
-EARLY_FUSION_MODALITIES = {
+MULTMODAL_MODALITIES = {
     Modality.AUDIO_LYRICS: ["audio", "lyrics"],
     Modality.AUDIO_VIDEO: ["audio", "video"],
     Modality.LYRICS_VIDEO: ["lyrics", "video"],
     Modality.ALL: ["audio", "lyrics", "video"],
 }
 
-for modality, modality_list in EARLY_FUSION_MODALITIES.items():
+for modality, modality_list in MULTMODAL_MODALITIES.items():
+    # Early fusion
     try:
         EARLY_FUSION_SYSTEMS[modality] = EarlyFusionRetrievalSystem(
             data_root=DATA_ROOT,
@@ -75,6 +78,15 @@ for modality, modality_list in EARLY_FUSION_MODALITIES.items():
         )
     except Exception as e:
         print(f"Early fusion init failed for {modality}: {e}")
+    # Late fusion
+    try:
+        LATE_FUSION_SYSTEMS[modality] = LateFusionRetrievalSystem(
+            data_root=DATA_ROOT,
+            evaluator=evaluator,
+            modalities=modality_list
+        )
+    except Exception as e:
+        print(f"Late fusion init failed for {modality}: {e}")
 
 
 current_slider_value = 10 # default value
@@ -196,6 +208,21 @@ async def main(page: ft.Page):
 
             strategy = EarlyFusionStrategy(ef_rs, selected_modality)
             print(selected_algorithm, selected_modality_list)
+
+        elif selected_algorithm == RetrievalAlgorithms.LATE_FUSION:
+            lf_rs = LATE_FUSION_SYSTEMS.get(selected_modality)
+
+            if lf_rs is None:
+                result_songs.controls.append(
+                    ft.Text("Selected modality not supported for Late Fusion", color="yellow")
+                )
+                page.update()
+                return
+
+            strategy = LateFusionStrategy(lf_rs, selected_modality)
+            print(selected_algorithm, selected_modality_list)
+
+
 
         else:
             result_songs.controls.append(ft.Text("Not implemented yet", color="yellow"))
@@ -483,5 +510,5 @@ async def main(page: ft.Page):
         )
     )
 
-ft.run(main)  # open YAMEx in a separate window
-#ft.run(main, view=ft.AppView.WEB_BROWSER) # opens YAMEx in browser
+#ft.run(main)  # open YAMEx in a separate window
+ft.run(main, view=ft.AppView.WEB_BROWSER) # opens YAMEx in browser
