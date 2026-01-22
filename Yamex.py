@@ -6,8 +6,9 @@ from enum import Enum
 
 from flet import UrlLauncher
 
-from strategies import RandomStrategy, UnimodalStrategy
+from strategies import EarlyFusionStrategy, RandomStrategy, UnimodalStrategy
 from unimodal import UnimodalRetrievalSystem, Evaluator
+from early_fusion import EarlyFusionRetrievalSystem
 
 # create a real HTML <iframe> element in the browser."
 def register_iframe():
@@ -16,12 +17,31 @@ def register_iframe():
 
 class RetrievalAlgorithms(str, Enum):
     RANDOM = "random"
-    UNIMODAL_AUDIO = "unimodal audio"
-    UNIMODAL_LYRIC = "unimodal lyrics"
-    UNIMODAL_VIDEO = "unimodal video"
+    UNIMODAL = "unimodal"
     EARLY_FUSION = "early_fusion"
     LATE_FUSION = "late_fusion"
     NEUTRAL_NETWORK = "neutral_network"
+
+class Modality(str, Enum):
+    AUDIO = "audio"
+    LYRICS = "lyrics"
+    VIDEO = "video"
+    AUDIO_LYRICS = "audio_lyrics"
+    AUDIO_VIDEO = "audio_video"
+    LYRICS_VIDEO = "lyrics_video"
+    ALL = "all"
+
+# helper directory
+MODALITY_MAP = {
+    Modality.AUDIO: ["audio"],
+    Modality.LYRICS: ["lyrics"],
+    Modality.VIDEO: ["video"],
+    Modality.AUDIO_LYRICS: ["audio", "lyrics"],
+    Modality.AUDIO_VIDEO: ["audio", "video"],
+    Modality.LYRICS_VIDEO: ["lyrics", "video"],
+    Modality.ALL: ["audio", "lyrics", "video"]
+}
+
 
 
 DATA_ROOT = "./data"
@@ -41,6 +61,13 @@ song_lookup_dict = master_df.set_index("id").to_dict("index")
 
 evaluator = Evaluator(DATA_ROOT)
 unimodal_rs = UnimodalRetrievalSystem(DATA_ROOT, evaluator)
+early_fusion_rs = EarlyFusionRetrievalSystem(
+    data_root=DATA_ROOT,
+    evaluator=evaluator,
+    modalities=["audio", "lyrics", "video"]
+)
+
+
 current_slider_value = 10 # default value
 current_algorithm = RetrievalAlgorithms.RANDOM
 retrieved_results = []
@@ -136,11 +163,25 @@ async def main(page: ft.Page):
             return
 
         # Select the strategy based on the dropdown value
-        selected_algo_key = RetrievalAlgorithms(dropdown_algorithm.value)
-        strategy = strategies.get(selected_algo_key)
+        selected_algorithm = dropdown_algorithm.value
+        selected_modality = dropdown_modality.value
+        selected_modality_list = MODALITY_MAP.get(dropdown_modality.value)
 
-        if not strategy:
-            result_songs.controls.append(ft.Text("Algorithm not yet implemented.", color="yellow"))
+        if selected_algorithm == RetrievalAlgorithms.RANDOM:
+            strategy = RandomStrategy(id_information_df["id"].tolist())
+            print(selected_algorithm, selected_modality_list)
+
+        elif selected_algorithm == RetrievalAlgorithms.UNIMODAL:
+#            strategy = UnimodalStrategy(unimodal_rs, selected_modality_list[0])
+            strategy = UnimodalStrategy(unimodal_rs, selected_modality)
+            print(selected_algorithm, selected_modality_list)
+
+        elif selected_algorithm == RetrievalAlgorithms.EARLY_FUSION:
+            strategy = EarlyFusionStrategy(early_fusion_rs, selected_modality)
+            print(selected_algorithm, selected_modality_list)
+
+        else:
+            result_songs.controls.append(ft.Text("Not implemented yet", color="yellow"))
             page.update()
             return
 
@@ -194,9 +235,9 @@ async def main(page: ft.Page):
 
     strategies = {
         RetrievalAlgorithms.RANDOM: RandomStrategy(id_information_df["id"].tolist()),
-        RetrievalAlgorithms.UNIMODAL_AUDIO: UnimodalStrategy(unimodal_rs, "audio"),
-        RetrievalAlgorithms.UNIMODAL_LYRIC: UnimodalStrategy(unimodal_rs, "lyrics"),
-        RetrievalAlgorithms.UNIMODAL_VIDEO: UnimodalStrategy(unimodal_rs, "video"),
+        RetrievalAlgorithms.UNIMODAL: UnimodalStrategy(unimodal_rs, "audio"),
+#        RetrievalAlgorithms.UNIMODAL_LYRIC: UnimodalStrategy(unimodal_rs, "lyrics"),
+#        RetrievalAlgorithms.UNIMODAL_VIDEO: UnimodalStrategy(unimodal_rs, "video"),
     }
 
     def on_song_click(song_data):
@@ -289,12 +330,34 @@ async def main(page: ft.Page):
         value=RetrievalAlgorithms.RANDOM,  # start value
         options=[
             ft.dropdown.Option(RetrievalAlgorithms.RANDOM.value, "Random baseline"),
-            ft.dropdown.Option(RetrievalAlgorithms.UNIMODAL_AUDIO.value, "Unimodal Audio"),
-            ft.dropdown.Option(RetrievalAlgorithms.UNIMODAL_LYRIC.value, "Unimodal Lyrics"),
-            ft.dropdown.Option(RetrievalAlgorithms.UNIMODAL_VIDEO.value, "Unimodal Videoclips"),
+            ft.dropdown.Option(RetrievalAlgorithms.UNIMODAL.value, "Unimodal"),
             ft.dropdown.Option(RetrievalAlgorithms.EARLY_FUSION.value, "Multimodal - Early fusion"),
             ft.dropdown.Option(RetrievalAlgorithms.LATE_FUSION.value, "Multimodal - Late fusion"),
             ft.dropdown.Option(RetrievalAlgorithms.NEUTRAL_NETWORK.value, "Neural-Network based")
+        ],
+        on_select=handle_dropdown_menu,
+        border_radius=20,
+        bgcolor=ft.Colors.DEEP_PURPLE_700,
+        border_color=ft.Colors.DEEP_PURPLE_200,
+        filled=True,
+        fill_color=ft.Colors.DEEP_PURPLE_800,
+        trailing_icon=ft.Icon(ft.Icons.ARROW_DROP_DOWN, color=ft.Colors.WHITE),
+        expand=True
+    )
+
+    dropdown_modality = ft.Dropdown(
+        label="Modality",
+        label_style=ft.TextStyle(color=ft.Colors.WHITE),
+        text_style=ft.TextStyle(color=ft.Colors.WHITE),
+        value=Modality.AUDIO,  # start value
+        options=[
+            ft.dropdown.Option(Modality.AUDIO.value, "Audio"),
+            ft.dropdown.Option(Modality.LYRICS.value, "Lyrics"),
+            ft.dropdown.Option(Modality.VIDEO.value, "Video"),
+            ft.dropdown.Option(Modality.AUDIO_LYRICS.value, "Audio and Lyrics"),
+            ft.dropdown.Option(Modality.AUDIO_VIDEO.value, "Audio and Video"),
+            ft.dropdown.Option(Modality.LYRICS_VIDEO.value, "Lyrics and Video"),
+            ft.dropdown.Option(Modality.ALL.value, "Audio, Lyrics and Video")
         ],
         on_select=handle_dropdown_menu,
         border_radius=20,
@@ -335,6 +398,11 @@ async def main(page: ft.Page):
             ),
             ft.Container(
                 content=dropdown_algorithm,
+                alignment=ft.alignment.Alignment.CENTER_LEFT,
+                col={"xs": 12, "md": 2},
+            ),
+            ft.Container(
+                content=dropdown_modality,
                 alignment=ft.alignment.Alignment.CENTER_LEFT,
                 col={"xs": 12, "md": 2},
             ),
@@ -397,5 +465,5 @@ async def main(page: ft.Page):
         )
     )
 
-ft.run(main)  # open YAMEx in a separate window
-#ft.run(main, view=ft.AppView.WEB_BROWSER) # opens YAMEx in browser
+#ft.run(main)  # open YAMEx in a separate window
+ft.run(main, view=ft.AppView.WEB_BROWSER) # opens YAMEx in browser
