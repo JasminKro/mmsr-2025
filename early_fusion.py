@@ -106,9 +106,10 @@ if __name__ == "__main__":
         modalities=["audio", "lyrics", "video"]
     )
 
-    #ids, metrics = early_fusion_rs.retrieve(query_id="NDroPROgWm3jBxjH", k_neighbors=5)  # returns metrics dictionary instead of cosine similarity list
+    #ids, metrics, scores = early_fusion_rs.retrieve(query_id="NDroPROgWm3jBxjH", k_neighbors=5)  # returns metrics dictionary instead of cosine similarity list
     #print("ids:", ids)
     #print("metrics:", metrics)
+    #print("scores:", scores)
 
     k = 10
 

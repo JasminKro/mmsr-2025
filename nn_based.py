@@ -90,7 +90,8 @@ class NeuralNetworkBasedRetrievalSystem:
             f"MRR@{k_neighbors}": self.evaluator.mrr(query_id, rankings, k_neighbors),
             f"nDCG@{k_neighbors}": self.evaluator.ndcg(query_id, rankings, k_neighbors),
         }
-        return top_ids, metrics
+        scores = [rankings[idx] for idx in top_indices[1:]]
+        return top_ids, metrics, scores
     
 
 
@@ -143,9 +144,10 @@ if __name__ == "__main__":
     #     experiment_num=1
     # )
 
-    # ids, metrics = nn_rs.retrieve(query_id="NDroPROgWm3jBxjH", k_neighbors=5)  # `modality` argument removed; returns metrics dictionary instead of cosine similarity list
+    # ids, metrics, scores = nn_rs.retrieve(query_id="NDroPROgWm3jBxjH", k_neighbors=5)  # `modality` argument removed; returns metrics dictionary instead of cosine similarity list
     # print("ids:", ids)
     # print("metrics:", metrics)
+    # print("scores:", scores)
     
     k = 10
     for query_modality in ["audio", "lyrics", "video"]:
