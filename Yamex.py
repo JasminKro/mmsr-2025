@@ -10,11 +10,6 @@ from strategies import EarlyFusionStrategy, RandomStrategy, UnimodalStrategy
 from unimodal import UnimodalRetrievalSystem, Evaluator
 from early_fusion import EarlyFusionRetrievalSystem
 
-# create a real HTML <iframe> element in the browser."
-def register_iframe():
-    import flet.fastapi as flet_fastapi # If using flet-fastapi
-    # On standard Flet, we use the page.page_id or specific web-registry
-
 class RetrievalAlgorithms(str, Enum):
     RANDOM = "random"
     UNIMODAL = "unimodal"
@@ -42,8 +37,6 @@ MODALITY_MAP = {
     Modality.ALL: ["audio", "lyrics", "video"]
 }
 
-
-
 DATA_ROOT = "./data"
 id_information_df = pd.read_csv(f"{DATA_ROOT}/id_information_mmsr.tsv", sep="\t")
 id_genres_df = pd.read_csv(f"{DATA_ROOT}/id_genres_mmsr.tsv", sep="\t")
@@ -61,11 +54,27 @@ song_lookup_dict = master_df.set_index("id").to_dict("index")
 
 evaluator = Evaluator(DATA_ROOT)
 unimodal_rs = UnimodalRetrievalSystem(DATA_ROOT, evaluator)
-early_fusion_rs = EarlyFusionRetrievalSystem(
-    data_root=DATA_ROOT,
-    evaluator=evaluator,
-    modalities=["audio", "lyrics", "video"]
-)
+
+# Early Fusion Pre-Initialization of all combinations
+# it takes long to load at starting program, but it enables a quick search for user
+EARLY_FUSION_SYSTEMS = {}
+
+EARLY_FUSION_MODALITIES = {
+    Modality.AUDIO_LYRICS: ["audio", "lyrics"],
+    Modality.AUDIO_VIDEO: ["audio", "video"],
+    Modality.LYRICS_VIDEO: ["lyrics", "video"],
+    Modality.ALL: ["audio", "lyrics", "video"],
+}
+
+for modality, modality_list in EARLY_FUSION_MODALITIES.items():
+    try:
+        EARLY_FUSION_SYSTEMS[modality] = EarlyFusionRetrievalSystem(
+            data_root=DATA_ROOT,
+            evaluator=evaluator,
+            modalities=modality_list
+        )
+    except Exception as e:
+        print(f"Early fusion init failed for {modality}: {e}")
 
 
 current_slider_value = 10 # default value
@@ -172,12 +181,20 @@ async def main(page: ft.Page):
             print(selected_algorithm, selected_modality_list)
 
         elif selected_algorithm == RetrievalAlgorithms.UNIMODAL:
-#            strategy = UnimodalStrategy(unimodal_rs, selected_modality_list[0])
             strategy = UnimodalStrategy(unimodal_rs, selected_modality)
             print(selected_algorithm, selected_modality_list)
 
         elif selected_algorithm == RetrievalAlgorithms.EARLY_FUSION:
-            strategy = EarlyFusionStrategy(early_fusion_rs, selected_modality)
+            ef_rs = EARLY_FUSION_SYSTEMS.get(selected_modality)
+
+            if ef_rs is None:
+                result_songs.controls.append(
+                    ft.Text("Selected modality not supported for Early Fusion", color="yellow")
+                )
+                page.update()
+                return
+
+            strategy = EarlyFusionStrategy(ef_rs, selected_modality)
             print(selected_algorithm, selected_modality_list)
 
         else:
@@ -215,6 +232,7 @@ async def main(page: ft.Page):
                     on_click=lambda e, s=song_info: on_song_click(s)
                 )
             )
+
         page.update()
 
     def find_id(query: str, column: str):
@@ -465,5 +483,5 @@ async def main(page: ft.Page):
         )
     )
 
-#ft.run(main)  # open YAMEx in a separate window
-ft.run(main, view=ft.AppView.WEB_BROWSER) # opens YAMEx in browser
+ft.run(main)  # open YAMEx in a separate window
+#ft.run(main, view=ft.AppView.WEB_BROWSER) # opens YAMEx in browser
