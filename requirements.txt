@@ -5,3 +5,4 @@ flet
 torch
 matplotlib
 tqdm
+flet-video

@@ -27,17 +27,14 @@ class LateFusionRetrievalSystem(UnimodalRetrievalSystem):
         fusion="rrf",
         norm="zscore",
         weighting="equal",
-        rrf_k=60, # typical value for k
+        rrf_k=60,
         topL=200,
         alpha=2.0,
         eps=1e-12,
     ):
         super().__init__(data_root, evaluator)
 
-        self.used_modalities = list(modalities) if modalities is not None else list(MODALITIES)
-
-        for m in self.used_modalities:
-            assert m in MODALITIES, f"invalid modality: {m}"
+        self.set_modality(modalities if modalities is not None else list(MODALITIES))
 
         self.fusion = fusion
         self.norm = norm
@@ -46,6 +43,41 @@ class LateFusionRetrievalSystem(UnimodalRetrievalSystem):
         self.topL = int(topL)
         self.alpha = float(alpha)
         self.eps = float(eps)
+
+    # rework later
+    def set_modality(self, modality):
+        """
+        UI/Strategy compatibility:
+          - accepts "audio" / "lyrics" / "video"
+          - accepts "audio_lyrics", "audio_video", "lyrics_video", "all"
+          - accepts list/tuple/set like ["audio","lyrics"]
+          - also accepts Enum values (uses .value)
+        """
+        # Enum -> value
+        if hasattr(modality, "value"):
+            modality = modality.value
+
+        # list/tuple/set -> list
+        if isinstance(modality, (list, tuple, set)):
+            mods = list(modality)
+
+        # string -> parse
+        elif isinstance(modality, str):
+            m = modality.strip().lower()
+            if m in ("all", "*"):
+                mods = list(MODALITIES)
+            elif "_" in m:
+                mods = m.split("_")  # "audio_lyrics" -> ["audio","lyrics"]
+            else:
+                mods = [m]
+        else:
+            raise TypeError(f"modality must be str or list/tuple/set, got {type(modality)}")
+
+        # validate
+        for mm in mods:
+            assert mm in MODALITIES, f"invalid modality: {mm}"  
+
+        self.used_modalities = mods
 
     # normalization helper methods
     @staticmethod
@@ -156,11 +188,14 @@ class LateFusionRetrievalSystem(UnimodalRetrievalSystem):
         raise ValueError("fusion must be 'rrf' or 'norm_sum'")
 
     # retrieve + metrics (like unimodal/early_fusion) for one query 
-    def retrieve(self, query_id, k_neighbors):
+    '''def retrieve(self, query_id, k_neighbors, return_scores=False):
         rankings = self.rankings(query_id=query_id)
         top_indices = np.argsort(rankings)[::-1][:k_neighbors + 1].tolist()
         top_ids = [self.index_to_id[idx] for idx in top_indices]
         top_ids.remove(query_id)
+
+        top_ids = top_ids[:k_neighbors]
+        top_scores = top_scores[:k_neighbors]
 
         metrics = {
             f"Precision@{k_neighbors}": self.evaluator.precision(query_id, rankings, k_neighbors),
@@ -168,7 +203,38 @@ class LateFusionRetrievalSystem(UnimodalRetrievalSystem):
             f"MRR@{k_neighbors}": self.evaluator.mrr(query_id, rankings, k_neighbors),
             f"nDCG@{k_neighbors}": self.evaluator.ndcg(query_id, rankings, k_neighbors),
         }
+        if return_scores:
+            return top_ids, metrics, top_scores
         return top_ids, metrics
+'''
+    def retrieve(self, query_id, k_neighbors):
+        rankings = self.rankings(query_id=query_id)
+
+        # take top k+1 because query itself is often in the list
+        top_indices = np.argsort(rankings)[::-1][:k_neighbors + 1].tolist()
+
+        top_ids = [self.index_to_id[idx] for idx in top_indices]
+        top_scores = [float(rankings[idx]) for idx in top_indices]
+
+        # remove the query itself (and its score) if present
+        if query_id in top_ids:
+            qpos = top_ids.index(query_id)
+            top_ids.pop(qpos)
+            top_scores.pop(qpos)
+
+        # ensure exactly k results
+        top_ids = top_ids[:k_neighbors]
+        top_scores = top_scores[:k_neighbors]
+
+        metrics = {
+            f"Precision@{k_neighbors}": self.evaluator.precision(query_id, rankings, k_neighbors),
+            f"Recall@{k_neighbors}": self.evaluator.recall(query_id, rankings, k_neighbors),
+            f"MRR@{k_neighbors}": self.evaluator.mrr(query_id, rankings, k_neighbors),
+            f"nDCG@{k_neighbors}": self.evaluator.ndcg(query_id, rankings, k_neighbors),
+        }
+
+        return top_ids, metrics, top_scores
+
 
 
 if __name__ == "__main__":
