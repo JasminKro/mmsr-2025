@@ -166,7 +166,7 @@ async def main(page: ft.Page):
     title = ft.Text(
         spans=[
             ft.TextSpan("YAMEx", ft.TextStyle(size=30, weight=ft.FontWeight.BOLD)),
-            ft.TextSpan("\nYet Another Music Explorer", ft.TextStyle(size=20)),
+            ft.TextSpan(" - Yet Another Music Explorer", ft.TextStyle(size=20)),
         ],
         text_align=ft.TextAlign.CENTER
     )
@@ -256,6 +256,8 @@ async def main(page: ft.Page):
             page.update()
             return
 
+        results_title.visible = False
+
         # Select the strategy based on the dropdown value
         selected_algorithm = dropdown_algorithm.value
         selected_modality = dropdown_modality.value
@@ -326,7 +328,7 @@ async def main(page: ft.Page):
         metrics_display.visible=True
         search_history.append(current_metrics)
 
-        algo_abbr = ALGO_ABBREVIATIONS.get(dropdown_algorithm.value, "-"),
+        algo_abbr = ALGO_ABBREVIATIONS.get(dropdown_algorithm.value, "-")
         modality_abbr = MODALITY_ABBREVIATIONS.get(dropdown_modality.value, "-")
 
         history_column.controls.insert(0, ft.Container(
@@ -405,7 +407,7 @@ async def main(page: ft.Page):
                 ft.Container(
                     content=ft.Text(g.strip(), color=ft.Colors.WHITE),
                     bgcolor=ft.Colors.DEEP_PURPLE_700,
-                    padding=ft.Padding(10,5,10,5),
+                    padding=ft.Padding(10,3,10,3),
                     border_radius=15,
                     border=ft.Border.all(1, ft.Colors.DEEP_PURPLE_200),
                ) for g in str(clean_genres).split(",") if g.strip() and g.strip().lower() != "nan"
@@ -437,7 +439,7 @@ async def main(page: ft.Page):
             ft.Text(f"Artist: {song_data['artist']}"),
             ft.Text(f"Album: {song_data['album_name']}"),
 #            ft.Text(f"ID: {song_data['id']}", size=12, color="grey"),
-            ft.Divider(height=1, color="transparent"),
+#            ft.Divider(height=1, color="transparent"),
             ft.Text("Genres:" ),
             genre_chips,
             ft.Divider(height=1, color="transparent"),
@@ -481,8 +483,6 @@ async def main(page: ft.Page):
         label="Algorithm",
         label_style=ft.TextStyle(color=ft.Colors.WHITE),
         text_style=ft.TextStyle(color=ft.Colors.WHITE),
-        width=float("inf"),
-#        width=300,
         value=RetrievalAlgorithms.RANDOM.value,  # start value
         options=[
             ft.dropdown.Option(RetrievalAlgorithms.RANDOM.value, "Random baseline"),
@@ -498,15 +498,13 @@ async def main(page: ft.Page):
         filled=True,
         fill_color=ft.Colors.DEEP_PURPLE_800,
         trailing_icon=ft.Icon(ft.Icons.ARROW_DROP_DOWN, color=ft.Colors.WHITE),
-        expand=True
+        width = 300
     )
 
     dropdown_modality = ft.Dropdown(
         label="Modality",
         label_style=ft.TextStyle(color=ft.Colors.WHITE),
         text_style=ft.TextStyle(color=ft.Colors.WHITE),
-        width=float("inf"),
-#        width=300,
         value=None,  # start value
         options=[],
         disabled=True,
@@ -517,22 +515,23 @@ async def main(page: ft.Page):
         filled=True,
         fill_color=ft.Colors.DEEP_PURPLE_800,
         trailing_icon=ft.Icon(ft.Icons.ARROW_DROP_DOWN, color=ft.Colors.WHITE),
-        expand=True
+        width = 300
     )
 
     search_button = ft.Button(
         content=ft.Row(
-            [ft.Icon(ft.Icons.SEARCH), ft.Text("Search Now")],
+            [ft.Icon(ft.Icons.SEARCH, color=ft.Colors.DEEP_PURPLE_900),
+             ft.Text("Search Now", color=ft.Colors.DEEP_PURPLE_900, weight="bold")],
             alignment=ft.MainAxisAlignment.CENTER,
             tight=True,
         ),
         on_click=handle_search_now,
         color=ft.Colors.WHITE,
-        bgcolor=ft.Colors.DEEP_PURPLE_800,
+        bgcolor=ft.Colors.DEEP_PURPLE_100,
         style=ft.ButtonStyle(
             shape=ft.RoundedRectangleBorder(radius=20),
             side=ft.BorderSide(
-                color=ft.Colors.DEEP_PURPLE_200,
+                color=ft.Colors.DEEP_PURPLE_800,
                 width=1
             ),
             padding=ft.Padding(20, 20, 20, 20),
@@ -545,32 +544,32 @@ async def main(page: ft.Page):
             # first row
             ft.Container(
                 content=search_field,
-                alignment=ft.alignment.Alignment.CENTER_RIGHT,
                 col={"xs": 12, "md": 6},
             ),
             ft.Container(
-                content=ft.Row([dropdown_algorithm]),
-                alignment=ft.alignment.Alignment.CENTER_LEFT,
-                col={"xs": 12, "md": 3},
+                content=ft.Row([dropdown_algorithm], expand=True),
+                col={"xs": 12, "md": 2},
+                alignment=ft.Alignment.CENTER
+            ),
+            ft.Container(  # placeholder for symmetry
+                col={"xs": 12, "md": 4},
             ),
             # second row
             ft.Container(
                 content=slider_group,
-                alignment=ft.alignment.Alignment.CENTER_LEFT,
                 col={"xs": 12, "md": 6},
             ),
             ft.Container(
-                content=ft.Row([dropdown_modality]),
-                alignment=ft.alignment.Alignment.CENTER_LEFT,
-                col={"xs": 12, "md": 3},
+                content=dropdown_modality,
+                col={"xs": 12, "md": 2},
             ),
             ft.Container(
                 content=search_button,
-                alignment=ft.alignment.Alignment.CENTER_LEFT,
                 col={"xs": 12, "md": 3},
+                alignment=ft.Alignment.CENTER_LEFT
             )
         ],
-        width=float("inf"),
+#        width=float("inf"),
         spacing=20
     )
 
@@ -591,25 +590,32 @@ async def main(page: ft.Page):
     result_songs = ft.Column(
         scroll=ft.ScrollMode.ALWAYS,
         expand=True,
-        height=500)
-
-    intermediate_results_container = ft.Container(
-        content=result_songs,
-        padding=15,
-        border=ft.Border.all(1, ft.Colors.DEEP_PURPLE_200),
-        border_radius=20,
-#        expand=True,
-        alignment=ft.Alignment.TOP_LEFT,
-        col={"xs": 12, "md": 4}  # xs = small monitor: full width, md = medium = 4 of 12 colums width
     )
 
-    result_container = ft.Container(
-        content=ft.Text("Details", color=ft.Colors.WHITE),
+    results_title = ft.Text("Top Results coming...", color=ft.Colors.WHITE)
+
+    intermediate_results_container = ft.Container(
+        content=ft.Column([
+            results_title,
+            ft.Container(content=result_songs, expand=True),
+            ]),
         padding=15,
         border=ft.Border.all(1, ft.Colors.DEEP_PURPLE_200),
         border_radius=20,
         expand=True,
         alignment=ft.Alignment.TOP_LEFT,
+        height=740,
+        col={"xs": 12, "md": 4}  # xs = small monitor: full width, md = medium = 4 of 12 colums width
+    )
+
+    result_container = ft.Container(
+        content=ft.Text("Details coming up...", color=ft.Colors.WHITE),
+        padding=15,
+        border=ft.Border.all(1, ft.Colors.DEEP_PURPLE_200),
+        border_radius=20,
+        expand=True,
+        alignment=ft.Alignment.TOP_LEFT,
+        height=740,
         col={"xs": 12, "md": 5}
     )
 
@@ -656,7 +662,8 @@ async def main(page: ft.Page):
             history_log_container
         ],
         spacing=25,
-        alignment=ft.MainAxisAlignment.START
+        alignment=ft.MainAxisAlignment.START,
+        expand=True
     )
 
     page.add(
@@ -665,7 +672,6 @@ async def main(page: ft.Page):
                 title,
                 control_grid,
                 metrics_display,
-                ft.Text("Top results:"),
                 result_row
             ],
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
