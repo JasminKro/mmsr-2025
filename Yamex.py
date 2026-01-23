@@ -32,7 +32,7 @@ class Modality(str, Enum):
     VIDEO_AUDIO = "video_audio"
     VIDEO_LYRICS = "video_lyrics"
     VIDEO_VIDEO = "video_video"
-    ALL = "all"
+    ALL = "audio_lyrics_video"
 
 # helper directory
 MODALITY_MAP = {
@@ -188,8 +188,36 @@ async def main(page: ft.Page):
 
     def handle_dropdown_menu(e):
         global current_algorithm
-        print(repr(e.control.value))
         current_algorithm = dropdown_algorithm.value
+
+        config = {
+            RetrievalAlgorithms.RANDOM: [],
+            RetrievalAlgorithms.UNIMODAL: [Modality.AUDIO, Modality.LYRICS, Modality.VIDEO],
+            RetrievalAlgorithms.EARLY_FUSION: [Modality.AUDIO_LYRICS, Modality.AUDIO_VIDEO,
+                                               Modality.LYRICS_VIDEO, Modality.ALL],
+            RetrievalAlgorithms.LATE_FUSION: [Modality.AUDIO_LYRICS, Modality.AUDIO_VIDEO,
+                                               Modality.LYRICS_VIDEO, Modality.ALL],
+            RetrievalAlgorithms.NEUTRAL_NETWORK: [Modality.AUDIO_AUDIO, Modality.AUDIO_LYRICS, Modality.AUDIO_VIDEO,
+                                                  Modality.LYRICS_AUDIO, Modality.LYRICS_LYRICS, Modality.LYRICS_VIDEO,
+                                                  Modality.VIDEO_AUDIO, Modality.VIDEO_LYRICS, Modality.VIDEO_VIDEO]
+        }
+        allowed = config.get(current_algorithm, [])
+        dropdown_modality.options = [
+            ft.dropdown.Option(
+                m.value,
+                m.value.replace("_", ", ").title())
+            for m in allowed
+        ]
+        if not allowed:
+            dropdown_modality.value = None
+            dropdown_modality.disabled = True
+            dropdown_modality.label = "No Modality Required"
+        else:
+            dropdown_modality.disabled = False
+            dropdown_modality.label = "Modality"
+            # Default to first option if current selection is now invalid
+            if dropdown_modality.value not in [m.value for m in allowed]:
+                dropdown_modality.value = allowed[0].value if allowed else None
         page.update()
 
     def create_search_field(
@@ -453,6 +481,8 @@ async def main(page: ft.Page):
         label="Algorithm",
         label_style=ft.TextStyle(color=ft.Colors.WHITE),
         text_style=ft.TextStyle(color=ft.Colors.WHITE),
+        width=float("inf"),
+#        width=300,
         value=RetrievalAlgorithms.RANDOM.value,  # start value
         options=[
             ft.dropdown.Option(RetrievalAlgorithms.RANDOM.value, "Random baseline"),
@@ -475,16 +505,11 @@ async def main(page: ft.Page):
         label="Modality",
         label_style=ft.TextStyle(color=ft.Colors.WHITE),
         text_style=ft.TextStyle(color=ft.Colors.WHITE),
-        value=Modality.AUDIO.value,  # start value
-        options=[
-            ft.dropdown.Option(Modality.AUDIO.value, "Audio"),
-            ft.dropdown.Option(Modality.LYRICS.value, "Lyrics"),
-            ft.dropdown.Option(Modality.VIDEO.value, "Video"),
-            ft.dropdown.Option(Modality.AUDIO_LYRICS.value, "Audio and Lyrics"),
-            ft.dropdown.Option(Modality.AUDIO_VIDEO.value, "Audio and Video"),
-            ft.dropdown.Option(Modality.LYRICS_VIDEO.value, "Lyrics and Video"),
-            ft.dropdown.Option(Modality.ALL.value, "Audio, Lyrics and Video")
-        ],
+        width=float("inf"),
+#        width=300,
+        value=None,  # start value
+        options=[],
+        disabled=True,
         on_select=handle_dropdown_menu,
         border_radius=20,
         bgcolor=ft.Colors.DEEP_PURPLE_700,
@@ -515,27 +540,34 @@ async def main(page: ft.Page):
         col={"xs": 8, "sm": 4, "md": 3},
     )
 
-    control_row = ft.ResponsiveRow(
+    control_grid = ft.ResponsiveRow(
         controls=[
+            # first row
             ft.Container(
                 content=search_field,
                 alignment=ft.alignment.Alignment.CENTER_RIGHT,
                 col={"xs": 12, "md": 6},
             ),
             ft.Container(
-                content=dropdown_algorithm,
+                content=ft.Row([dropdown_algorithm]),
                 alignment=ft.alignment.Alignment.CENTER_LEFT,
-                col={"xs": 12, "md": 2},
+                col={"xs": 12, "md": 3},
             ),
-            ft.Container(
-                content=dropdown_modality,
-                alignment=ft.alignment.Alignment.CENTER_LEFT,
-                col={"xs": 12, "md": 2},
-            ),
+            # second row
             ft.Container(
                 content=slider_group,
                 alignment=ft.alignment.Alignment.CENTER_LEFT,
-                col={"xs": 12, "md": 4},
+                col={"xs": 12, "md": 6},
+            ),
+            ft.Container(
+                content=ft.Row([dropdown_modality]),
+                alignment=ft.alignment.Alignment.CENTER_LEFT,
+                col={"xs": 12, "md": 3},
+            ),
+            ft.Container(
+                content=search_button,
+                alignment=ft.alignment.Alignment.CENTER_LEFT,
+                col={"xs": 12, "md": 3},
             )
         ],
         width=float("inf"),
@@ -631,8 +663,7 @@ async def main(page: ft.Page):
         ft.Column(
             controls=[
                 title,
-                control_row,
-                search_button,
+                control_grid,
                 metrics_display,
                 ft.Text("Top results:"),
                 result_row
@@ -642,6 +673,7 @@ async def main(page: ft.Page):
             expand=True
         )
     )
+    handle_dropdown_menu(None)
 
 ft.run(main)  # open YAMEx in a separate window
 #ft.run(main, view=ft.AppView.WEB_BROWSER) # opens YAMEx in browser
