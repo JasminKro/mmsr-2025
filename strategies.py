@@ -31,14 +31,13 @@ class RetrievalStrategy(ABC):
 
 
 class RandomStrategy(RetrievalStrategy):
-    def __init__(self, all_ids):
-        self.all_ids = all_ids
+    def __init__(self, rs_instance):
+        self.rs = rs_instance
 
     def search(self, query_id, k):
-        # Pick k random IDs from the dataset
-        ids = random.sample(self.all_ids, min(k, len(self.all_ids)))
-        scores = [0.0] * len(ids)
-        return ids, scores
+        ids, metrics, scores = self.rs.retrieve(query_id=query_id, k_neighbors=k)
+        #ids, metrics, scores = random.sample(self.all_ids, min(k, len(self.all_ids)))
+        return ids, metrics, scores
 
 
 class UnimodalStrategy(RetrievalStrategy):
@@ -48,12 +47,8 @@ class UnimodalStrategy(RetrievalStrategy):
 
     def search(self, query_id, k):
         self.rs.set_modality(self.modality)
-        ids, metrics = self.rs.retrieve(query_id=query_id, k_neighbors=k)
-
-        # Extract scores from the metrics dictionary
-        # We use .get() as a fallback in case 'cosine_sim' isn't the key
-        scores = metrics.get("cosine_sim", [0.0] * len(ids))
-        return ids, scores
+        ids, metrics, scores = self.rs.retrieve(query_id=query_id, k_neighbors=k)
+        return ids, metrics, scores
 
 class EarlyFusionStrategy(RetrievalStrategy):
     def __init__(self, rs_instance, modalities):
@@ -61,12 +56,8 @@ class EarlyFusionStrategy(RetrievalStrategy):
         self.modalities = modalities
 
     def search(self, query_id, k):
-        ids, metrics = self.rs.retrieve(query_id=query_id, k_neighbors=k)
-
-        # Extract scores from the metrics dictionary
-        # We use .get() as a fallback in case 'cosine_sim' isn't the key
-        scores = metrics.get("cosine_sim", [0.0] * len(ids))
-        return ids, scores
+        ids, metrics, scores = self.rs.retrieve(query_id=query_id, k_neighbors=k)
+        return ids, metrics, scores
 
 class LateFusionStrategy(RetrievalStrategy):
     def __init__(self, rs_instance, modalities):
@@ -74,9 +65,6 @@ class LateFusionStrategy(RetrievalStrategy):
         self.modalities = modalities
 
     def search(self, query_id, k):
-        ids, metrics = self.rs.retrieve(query_id=query_id, k_neighbors=k)
-
-        # Extract scores from the metrics dictionary
-        # We use .get() as a fallback in case 'cosine_sim' isn't the key
-        scores = metrics.get("cosine_sim", [0.0] * len(ids))
-        return ids, scores
+        self.rs.set_modality(self.modalities)
+        ids, metrics, scores = self.rs.retrieve(query_id=query_id, k_neighbors=k)
+        return ids, metrics, scores

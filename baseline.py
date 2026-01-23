@@ -22,7 +22,14 @@ class RandomBaselineRetrievalSystem:
         top_ids = [self.evaluator.ids[i] for i in top_idx if self.evaluator.ids[i] != query_id][:k_neighbors]
         top_scores = [float(scores[self.evaluator.id_to_idx[tid]]) if hasattr(self.evaluator, "id_to_idx") else float(scores[i])
                       for i, tid in zip(top_idx, [self.evaluator.ids[i] for i in top_idx]) if tid != query_id][:k_neighbors]
-        return top_ids, top_scores
+        metrics = {
+            f"Precision@{k_neighbors}": self.evaluator.precision(query_id, scores, k_neighbors),
+            f"Recall@{k_neighbors}": self.evaluator.recall(query_id, scores, k_neighbors),
+            f"MRR@{k_neighbors}": self.evaluator.mrr(query_id, scores, k_neighbors),
+            f"nDCG@{k_neighbors}": self.evaluator.ndcg(query_id, scores, k_neighbors),
+        }
+
+        return top_ids, metrics, top_scores
 
 
 if __name__ == "__main__":

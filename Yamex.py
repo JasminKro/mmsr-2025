@@ -6,6 +6,7 @@ from enum import Enum
 
 from flet import UrlLauncher
 
+from baseline import RandomBaselineRetrievalSystem
 from strategies import EarlyFusionStrategy, LateFusionStrategy, RandomStrategy, UnimodalStrategy
 from unimodal import UnimodalRetrievalSystem, Evaluator
 from early_fusion import EarlyFusionRetrievalSystem
@@ -50,25 +51,28 @@ master_df = (id_information_df
 )
 #print(master_df.head(10).to_string())
 
-# convert data framt to dictionary
+# convert data frame to dictionary
 song_lookup_dict = master_df.set_index("id").to_dict("index")
 
 evaluator = Evaluator(DATA_ROOT)
+random_rs = RandomBaselineRetrievalSystem(evaluator, seed=None)
 unimodal_rs = UnimodalRetrievalSystem(DATA_ROOT, evaluator)
+
 
 # Early Fusion Pre-Initialization of all combinations
 # it takes long to load at starting program, but it enables a quick search for user
 EARLY_FUSION_SYSTEMS = {}
 LATE_FUSION_SYSTEMS = {}
 
-MULTMODAL_MODALITIES = {
+MULTIMODAL_MODALITIES = {
     Modality.AUDIO_LYRICS: ["audio", "lyrics"],
     Modality.AUDIO_VIDEO: ["audio", "video"],
     Modality.LYRICS_VIDEO: ["lyrics", "video"],
     Modality.ALL: ["audio", "lyrics", "video"],
 }
 
-for modality, modality_list in MULTMODAL_MODALITIES.items():
+
+for modality, modality_list in MULTIMODAL_MODALITIES.items():
     # Early fusion
     try:
         EARLY_FUSION_SYSTEMS[modality] = EarlyFusionRetrievalSystem(
@@ -89,9 +93,11 @@ for modality, modality_list in MULTMODAL_MODALITIES.items():
         print(f"Late fusion init failed for {modality}: {e}")
 
 
+
 current_slider_value = 10 # default value
 current_algorithm = RetrievalAlgorithms.RANDOM
 retrieved_results = []
+search_history = []
 
 async def main(page: ft.Page):
     page.scroll = ft.ScrollMode.AUTO
@@ -189,8 +195,8 @@ async def main(page: ft.Page):
         selected_modality_list = MODALITY_MAP.get(dropdown_modality.value)
 
         if selected_algorithm == RetrievalAlgorithms.RANDOM:
-            strategy = RandomStrategy(id_information_df["id"].tolist())
-            print(selected_algorithm, selected_modality_list)
+            strategy = RandomStrategy(random_rs)
+            print(selected_algorithm)
 
         elif selected_algorithm == RetrievalAlgorithms.UNIMODAL:
             strategy = UnimodalStrategy(unimodal_rs, selected_modality)
@@ -230,15 +236,51 @@ async def main(page: ft.Page):
             return
 
         # execute search
-        ids, scores = strategy.search(query_id, current_slider_value)
+        ids, raw_metrics, scores = strategy.search(query_id, current_slider_value)
+        print(f"DEBUG: scores: {scores}")
+        print(f"DEBUG: metrics: {raw_metrics}")
+
+        # 1. Store cleaned metrics in a dictionary (from numpy type to standard)
+        current_metrics = {
+            "algorithm": dropdown_algorithm.value,
+            "modality": dropdown_modality.value,
+            "precision": float(raw_metrics.get(f"Precision@{current_slider_value}", 0.0)),
+            "recall": float(raw_metrics.get(f"Recall@{current_slider_value}", 0.0)),
+            "mrr": float(raw_metrics.get(f"MRR@{current_slider_value}", 0.0)),
+            "ndcg": float(raw_metrics.get(f"nDCG@{current_slider_value}", 0.0))
+        }
+        print(current_metrics)
+        # 2. Update the UI using your dictionary
+        precision_text.value = f"Precision@{current_slider_value}: {current_metrics['precision']:.4f}  "
+        recall_text.value = f"  Recall@{current_slider_value}: {current_metrics['recall']:.4f}  "
+        mmr_text.value = f"  MRR@{current_slider_value}:  {current_metrics['mrr']:.4f}  "
+        ndcg_text.value = f"  nDCG@{current_slider_value}:  {current_metrics['ndcg']:.4f}"
+
+        metrics_display.visible=True
+        search_history.append(current_metrics)
+
+        history_column.controls.insert(0, ft.Container(
+            content=ft.Row([
+                ft.Text(f"{current_metrics['algorithm']} ({current_metrics['modality']})"),
+                ft.Text(f"{current_metrics['precision']:.4f}"),
+                ft.Text(f"{current_metrics['recall']:.4f}"),
+                ft.Text(f"{current_metrics['mrr']:.4f}"),
+                ft.Text(f"{current_metrics['ndcg']:.4f}")
+            ]),
+        ))
+
+        history_log_container.visible=True
+        page.update()
 
         # update UI
         retrieved_results.clear()
         for i, (ret_id, score) in enumerate(zip(ids, scores)):
             res = song_lookup_dict.get(ret_id)
-
             if not res:
                 continue
+
+            # Convert NumPy float64 to Python float
+            display_score = float(score)
 
             song_info = {
                 "index": i + 1,
@@ -247,7 +289,8 @@ async def main(page: ft.Page):
                 "artist": res["artist"],
                 "album_name": res["album_name"],
                 "url": res["url"],
-                "genres": res.get("genre", "N/A")
+                "genres": res.get("genre", "N/A"),
+                "score": display_score,
             }
             retrieved_results.append(song_info)
 
@@ -256,7 +299,8 @@ async def main(page: ft.Page):
                     leading=ft.Text(f"[{song_info['index']}]", color="white70", size=14),
                     title=ft.Text(f"{song_info['song']}", color="white", weight=ft.FontWeight.BOLD),
                     subtitle=ft.Text(f"{song_info['artist']}, {song_info['album_name']}", color="white70"),
-                    on_click=lambda e, s=song_info: on_song_click(s)
+                    on_click=lambda e, s=song_info: on_song_click(s),
+                    trailing=ft.Text(f" score: {display_score:.4f}", color="white70", size=14),
                 )
             )
 
@@ -276,14 +320,6 @@ async def main(page: ft.Page):
         )
         found = master_df[mask]
         return found.iloc[0]["id"] if not found.empty else None
-
-
-    strategies = {
-        RetrievalAlgorithms.RANDOM: RandomStrategy(id_information_df["id"].tolist()),
-        RetrievalAlgorithms.UNIMODAL: UnimodalStrategy(unimodal_rs, "audio"),
-#        RetrievalAlgorithms.UNIMODAL_LYRIC: UnimodalStrategy(unimodal_rs, "lyrics"),
-#        RetrievalAlgorithms.UNIMODAL_VIDEO: UnimodalStrategy(unimodal_rs, "video"),
-    }
 
     def on_song_click(song_data):
         video_url = song_data.get("url", "")
@@ -349,6 +385,7 @@ async def main(page: ft.Page):
 #            ft.Text(f"URL: {song_data['url']}", size=12, color="grey"),
             ], scroll=ft.ScrollMode.AUTO)
         page.update()
+
     search_field = create_search_field(on_submit_callback=handle_search_now)
 
     results_slider = ft.Slider(
@@ -372,7 +409,7 @@ async def main(page: ft.Page):
         label="Algorithm",
         label_style=ft.TextStyle(color=ft.Colors.WHITE),
         text_style=ft.TextStyle(color=ft.Colors.WHITE),
-        value=RetrievalAlgorithms.RANDOM,  # start value
+        value=RetrievalAlgorithms.RANDOM.value,  # start value
         options=[
             ft.dropdown.Option(RetrievalAlgorithms.RANDOM.value, "Random baseline"),
             ft.dropdown.Option(RetrievalAlgorithms.UNIMODAL.value, "Unimodal"),
@@ -394,7 +431,7 @@ async def main(page: ft.Page):
         label="Modality",
         label_style=ft.TextStyle(color=ft.Colors.WHITE),
         text_style=ft.TextStyle(color=ft.Colors.WHITE),
-        value=Modality.AUDIO,  # start value
+        value=Modality.AUDIO.value,  # start value
         options=[
             ft.dropdown.Option(Modality.AUDIO.value, "Audio"),
             ft.dropdown.Option(Modality.LYRICS.value, "Lyrics"),
@@ -461,6 +498,20 @@ async def main(page: ft.Page):
         spacing=20
     )
 
+    precision_text = ft.Text("Precision: --", color=ft.Colors.WHITE)
+    recall_text = ft.Text("Recall: --", color=ft.Colors.WHITE)
+    mmr_text = ft.Text("MRR: --", color=ft.Colors.WHITE)
+    ndcg_text = ft.Text("nDCG: --", color=ft.Colors.WHITE)
+
+    metrics_display = ft.Container(
+        content=ft.Row(
+            [precision_text, recall_text, mmr_text, ndcg_text],
+            alignment=ft.MainAxisAlignment.CENTER,
+        ),
+        bgcolor=ft.Colors.DEEP_PURPLE_800,
+        visible=False  # hidden by default
+    )
+
     result_songs = ft.Column(
         scroll=ft.ScrollMode.ALWAYS,
         expand=True,
@@ -473,7 +524,7 @@ async def main(page: ft.Page):
         border_radius=20,
 #        expand=True,
         alignment=ft.Alignment.TOP_LEFT,
-        col={"xs": 12, "md": 6}  # xs = small monitor: full width, md = medium = 6 of 12 colums width
+        col={"xs": 12, "md": 4}  # xs = small monitor: full width, md = medium = 4 of 12 colums width
     )
 
     result_container = ft.Container(
@@ -483,13 +534,29 @@ async def main(page: ft.Page):
         border_radius=20,
         expand=True,
         alignment=ft.Alignment.TOP_LEFT,
-        col={"xs": 12, "md": 6}
+        col={"xs": 12, "md": 5}
+    )
+
+    history_column = ft.Column()
+    history_log_container = ft.Container(
+        content=ft.Column([
+            ft.Text("Comparison Log: ", weight="bold"),
+            ft.Divider(color=ft.Colors.DEEP_PURPLE_200),
+            ft.Column([history_column], scroll=ft.ScrollMode.ALWAYS, expand=True)
+        ]),
+        bgcolor=ft.Colors.DEEP_PURPLE_800,
+        padding = 15,
+        border = ft.Border.all(1, ft.Colors.DEEP_PURPLE_200),
+        border_radius = 20,
+        col={"xs": 12, "md": 3},
+        visible=False
     )
 
     result_row = ft.ResponsiveRow(
         controls=[
             intermediate_results_container,
-            result_container
+            result_container,
+            history_log_container
         ],
         spacing=25,
         alignment=ft.MainAxisAlignment.START
@@ -501,6 +568,7 @@ async def main(page: ft.Page):
                 title,
                 control_row,
                 search_button,
+                metrics_display,
                 ft.Text("Top results:"),
                 result_row
             ],
@@ -510,5 +578,5 @@ async def main(page: ft.Page):
         )
     )
 
-#ft.run(main)  # open YAMEx in a separate window
-ft.run(main, view=ft.AppView.WEB_BROWSER) # opens YAMEx in browser
+ft.run(main)  # open YAMEx in a separate window
+#ft.run(main, view=ft.AppView.WEB_BROWSER) # opens YAMEx in browser
