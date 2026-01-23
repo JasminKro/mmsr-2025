@@ -252,9 +252,20 @@ async def main(page: ft.Page):
         result_songs.controls.clear()
 
         if not query_id:
+            query_info_display.visible=False  # hide if search fails
             result_songs.controls.append(ft.Text("No results found for that query.", color="red"))
             page.update()
             return
+
+        # details for query
+        query_details = song_lookup_dict.get(query_id, {})
+        query_title = query_details.get("song", "Unknown")
+        query_artist = query_details.get("artist", "Unknown")
+        query_album = query_details.get("album_name", "Unknown")
+
+        # Update the new display
+        query_info_text.value = f"Query Info: {query_title} by {query_artist}, {query_album} | id: {query_id}"
+        query_info_display.visible = True
 
         results_title.visible = False
 
@@ -442,21 +453,23 @@ async def main(page: ft.Page):
 #            ft.Divider(height=1, color="transparent"),
             ft.Text("Genres:" ),
             genre_chips,
-            ft.Divider(height=1, color="transparent"),
+#            ft.Divider(height=1, color="transparent"),
+            # Add a direct link button as a backup
+            ft.Button(
+                content=ft.Text(f"Open Video in New Tab: {song_data['url']}", size=12, color=ft.Colors.DEEP_PURPLE_900),
+                icon=ft.Icons.OPEN_IN_NEW,
+                icon_color=ft.Colors.DEEP_PURPLE_900,
+                on_click=handle_open_link,
+                bgcolor=ft.Colors.DEEP_PURPLE_100,
+            ),
+
             # The Video Player
             ft.Container(
                 content=video_player,
                 border=ft.Border.all(1, ft.Colors.DEEP_PURPLE_200),
                 border_radius=10,
                 padding=10,
-            ),
-            # Add a direct link button as a backup
-            ft.Button(
-                content=ft.Text("Open Video in New Tab"),
-                icon=ft.Icons.OPEN_IN_NEW,
-                on_click=handle_open_link
-            ),
-#            ft.Text(f"URL: {song_data['url']}", size=12, color="grey"),
+            )
             ], scroll=ft.ScrollMode.AUTO)
         page.update()
 
@@ -521,7 +534,10 @@ async def main(page: ft.Page):
     search_button = ft.Button(
         content=ft.Row(
             [ft.Icon(ft.Icons.SEARCH, color=ft.Colors.DEEP_PURPLE_900),
-             ft.Text("Search Now", color=ft.Colors.DEEP_PURPLE_900, weight="bold")],
+             ft.Text("Search Now",
+                     color=ft.Colors.DEEP_PURPLE_900,
+                     weight=ft.FontWeight.BOLD,
+                     size=18)],
             alignment=ft.MainAxisAlignment.CENTER,
             tight=True,
         ),
@@ -569,8 +585,19 @@ async def main(page: ft.Page):
                 alignment=ft.Alignment.CENTER_LEFT
             )
         ],
-#        width=float("inf"),
         spacing=20
+    )
+
+    # text element to show query details
+    query_info_text = ft.Text("", color=ft.Colors.DEEP_PURPLE_100, weight=ft.FontWeight.W_500)
+
+    query_info_display = ft.Container(
+        content=ft.Row(
+            [ft.Icon(ft.Icons.INFO_OUTLINE, color=ft.Colors.DEEP_PURPLE_200, size=20),
+                query_info_text],
+            alignment=ft.MainAxisAlignment.CENTER,
+        ),
+        visible=False  # Hidden until a search happens
     )
 
     precision_text = ft.Text("Precision: --", color=ft.Colors.WHITE)
@@ -592,7 +619,7 @@ async def main(page: ft.Page):
         expand=True,
     )
 
-    results_title = ft.Text("Top Results coming...", color=ft.Colors.WHITE)
+    results_title = ft.Text("Top Results shown after seach...", color=ft.Colors.WHITE)
 
     intermediate_results_container = ft.Container(
         content=ft.Column([
@@ -609,7 +636,7 @@ async def main(page: ft.Page):
     )
 
     result_container = ft.Container(
-        content=ft.Text("Details coming up...", color=ft.Colors.WHITE),
+        content=ft.Text("For details, click on a song :-)", color=ft.Colors.WHITE),
         padding=15,
         border=ft.Border.all(1, ft.Colors.DEEP_PURPLE_200),
         border_radius=20,
@@ -671,6 +698,7 @@ async def main(page: ft.Page):
             controls=[
                 title,
                 control_grid,
+                query_info_display,
                 metrics_display,
                 result_row
             ],
