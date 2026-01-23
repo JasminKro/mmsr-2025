@@ -23,9 +23,15 @@ class Modality(str, Enum):
     AUDIO = "audio"
     LYRICS = "lyrics"
     VIDEO = "video"
+    AUDIO_AUDIO = "audio_audio"
     AUDIO_LYRICS = "audio_lyrics"
     AUDIO_VIDEO = "audio_video"
+    LYRICS_LYRICS = "lyrics_lyrics"
+    LYRICS_AUDIO = "lyrics_audio"
     LYRICS_VIDEO = "lyrics_video"
+    VIDEO_AUDIO = "video_audio"
+    VIDEO_LYRICS = "video_lyrics"
+    VIDEO_VIDEO = "video_video"
     ALL = "all"
 
 # helper directory
@@ -92,6 +98,30 @@ for modality, modality_list in MULTIMODAL_MODALITIES.items():
     except Exception as e:
         print(f"Late fusion init failed for {modality}: {e}")
 
+
+ALGO_ABBREVIATIONS = {
+    RetrievalAlgorithms.RANDOM: "rand",
+    RetrievalAlgorithms.UNIMODAL: "uni",
+    RetrievalAlgorithms.LATE_FUSION: "late f",
+    RetrievalAlgorithms.EARLY_FUSION: "early f",
+    RetrievalAlgorithms.NEUTRAL_NETWORK: "nn"
+}
+
+MODALITY_ABBREVIATIONS = {
+    Modality.AUDIO: "a",
+    Modality.LYRICS: "l",
+    Modality.VIDEO: "v",
+    Modality.AUDIO_AUDIO: "a-a",
+    Modality.AUDIO_LYRICS: "a-l",
+    Modality.AUDIO_VIDEO: "a-v",
+    Modality.LYRICS_AUDIO: "l-a",
+    Modality.LYRICS_LYRICS: "l-l",
+    Modality.LYRICS_VIDEO: "l-v",
+    Modality.VIDEO_AUDIO: "v-a",
+    Modality.VIDEO_LYRICS: "v-l",
+    Modality.VIDEO_VIDEO: "v-v",
+    Modality.ALL: "a-l-v"
+}
 
 
 current_slider_value = 10 # default value
@@ -178,6 +208,15 @@ async def main(page: ft.Page):
                 if on_submit_callback else None
         )
 
+    def log_text(content, weight=ft.FontWeight.NORMAL):
+        return ft.Text(
+            content,
+            size=11,
+            font_family="monospace",  # for typewriter look
+            weight=weight,
+            color=ft.Colors.DEEP_PURPLE_50
+        )
+
     def handle_search_now(e=None):
         query = search_field.value.strip()
         query_id = resolve_unimode_query_id(query)
@@ -259,14 +298,19 @@ async def main(page: ft.Page):
         metrics_display.visible=True
         search_history.append(current_metrics)
 
+        algo_abbr = ALGO_ABBREVIATIONS.get(dropdown_algorithm.value, "-"),
+        modality_abbr = MODALITY_ABBREVIATIONS.get(dropdown_modality.value, "-")
+
         history_column.controls.insert(0, ft.Container(
+            padding=ft.Padding.only(bottom=5),
             content=ft.Row([
-                ft.Text(f"{current_metrics['algorithm']} ({current_metrics['modality']})"),
-                ft.Text(f"{current_metrics['precision']:.4f}"),
-                ft.Text(f"{current_metrics['recall']:.4f}"),
-                ft.Text(f"{current_metrics['mrr']:.4f}"),
-                ft.Text(f"{current_metrics['ndcg']:.4f}")
-            ]),
+                ft.Container(content=log_text(algo_abbr), width=50),
+                ft.Container(content=log_text(modality_abbr), width=40),
+                ft.Container(content=log_text(f"{current_metrics['precision']:.4f}"), width=45),
+                ft.Container(content=log_text(f"{current_metrics['recall']:.4f}"), width=45),
+                ft.Container(content=log_text(f"{current_metrics['mrr']:.4f}"), width=45),
+                ft.Container(content=log_text(f"{current_metrics['ndcg']:.4f}"), width=45)
+            ], spacing=10)
         ))
 
         history_log_container.visible=True
@@ -541,10 +585,31 @@ async def main(page: ft.Page):
     history_log_container = ft.Container(
         content=ft.Column([
             ft.Text("Comparison Log: ", weight="bold"),
-            ft.Divider(color=ft.Colors.DEEP_PURPLE_200),
-            ft.Column([history_column], scroll=ft.ScrollMode.ALWAYS, expand=True)
+            ft.Divider(color=ft.Colors.DEEP_PURPLE_200, height=1),
+            ft.Row(
+                controls=[
+                    ft.Column(
+                        controls=[
+                            ft.Row([
+                            # header
+                            ft.Container(content=log_text("ALGO", ft.FontWeight.BOLD), width=50),
+                            ft.Container(content=log_text("MOD", ft.FontWeight.BOLD), width=40),
+                            ft.Container(content=log_text("PREC", ft.FontWeight.BOLD), width=45),
+                            ft.Container(content=log_text("RECL", ft.FontWeight.BOLD), width=45),
+                            ft.Container(content=log_text("MRR", ft.FontWeight.BOLD), width=45),
+                            ft.Container(content=log_text("nDCG", ft.FontWeight.BOLD), width=45),
+                        ], spacing=10),
+                        ft.Divider(color=ft.Colors.DEEP_PURPLE_200, height=1),
+                        # data rows
+                        history_column,
+                        ],
+                        scroll=ft.ScrollMode.ALWAYS, expand=True  # vertical scroll
+                    )
+                ],
+                scroll=ft.ScrollMode.ALWAYS, expand=True  # horizontal scroll
+            )
         ]),
-        bgcolor=ft.Colors.DEEP_PURPLE_800,
+        bgcolor=ft.Colors.DEEP_PURPLE_900,
         padding = 15,
         border = ft.Border.all(1, ft.Colors.DEEP_PURPLE_200),
         border_radius = 20,
