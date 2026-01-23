@@ -33,6 +33,8 @@ class Evaluator:
         genres = [set(ast.literal_eval(genres_str)) for genres_str in df.genre.to_list()]
         self.genres = dict(zip(ids, genres))
         self.ids = ids
+        self.id_to_index = {tid: i for i, tid in enumerate(self.ids)}
+
 
         # total listens / popularity  (JETZT erst möglich, weil self.ids existiert)
         df_pop = pd.read_csv(os.path.join(data_root, DATAFRAMES["popularity"]), sep="\t")
@@ -68,24 +70,41 @@ class Evaluator:
     # -------------------------
     # POP Metric
     # -------------------------
-    def pop_at_k(self, query_id, rankings, k, log1p=True):
+    def pop_at_k(self, query_id, rankings, k, transform="log1p"):
         """
-        Pop@k: average popularity (total_listens) of the Top-k retrieved items.
-        If log1p=True, uses log(1+listens) to reduce heavy-tail skew.
+        Popularity@k: mean popularity of top-k retrieved items for a query.
+        transform:
+        - "raw"   : uses listens directly
+        - "log1p" : uses log(1+listens) (avoid heavy-tailed listens)
         """
-        query_index = self.ids.index(query_id)
+        qidx = self.id_to_index[query_id]
 
-        # remove query itself
-        rankings_ = np.delete(rankings, query_index)
-        listens_ = np.delete(self.listens, query_index)
+        # sort all docs by score descending
+        order = np.argsort(rankings)[::-1]
 
-        top_idx = np.argsort(rankings_)[::-1][:k]
-        vals = listens_[top_idx]
+        # drop query itself, then take top-k
+        order = order[order != qidx][:k]
 
-        if log1p:
+        vals = self.listens[order].astype(np.float64)
+
+        if transform == "log1p":
             vals = np.log1p(vals)
+        elif transform == "raw":
+            pass
+        else:
+            raise ValueError("transform must be 'raw' or 'log1p'")
 
-        return float(np.mean(vals))
+        return float(vals.mean())
+
+    def catalog_popularity(self, transform="log1p"):
+        vals = self.listens.astype(np.float64)
+        if transform == "log1p":
+            vals = np.log1p(vals)
+        elif transform == "raw":
+            pass
+        else:
+            raise ValueError("transform must be 'raw' or 'log1p'")
+        return float(vals.mean())
 
     
     # -------------------------
@@ -205,7 +224,7 @@ def plot_hist(values, title, xlabel, bins=20):
     plt.show()
 
 
-def evaluate_system(evaluator, rs, k):
+def evaluate_system(evaluator, rs, k, pop_transform="log1p"):
 
     # Jaccard-threshold metrics
     precisions, recalls, mrrs, ndcgs = [], [], [], []
@@ -213,6 +232,7 @@ def evaluate_system(evaluator, rs, k):
     precisions_o, recalls_o, mrrs_o, ndcgs_o = [], [], [], []
 
     pops = []
+    retrieved_union = set()  
 
     for id in tqdm(evaluator.ids, desc=f"Evaluating {rs.__class__.__name__}", unit="track"):
 
@@ -242,8 +262,20 @@ def evaluate_system(evaluator, rs, k):
         if r2 is not None:
             recalls_o.append(r2)
 
-        # popularity 
-        pops.append(evaluator.pop_at_k(query_id=id, rankings=rankings, k=k, log1p=True))
+        # ---- beyond accuracy: coverage + popularity ----
+        qidx = evaluator.id_to_index[id]
+        order = np.argsort(rankings)[::-1]
+        order = order[order != qidx][:k]
+
+        # union of retrieved docs (coverage@k)
+        for idx in order:
+            retrieved_union.add(evaluator.ids[idx])
+
+        # popularity@k for this query
+        vals = evaluator.listens[order].astype(np.float64)
+        if pop_transform == "log1p":
+            vals = np.log1p(vals)
+        pops.append(float(vals.mean()))
 
     # Compute statistics
     precisions = np.array(precisions)
@@ -257,6 +289,11 @@ def evaluate_system(evaluator, rs, k):
     ndcgs_o = np.array(ndcgs_o)
 
     pops = np.array(pops, dtype=np.float64)
+    coverage = len(retrieved_union) / len(evaluator.ids)
+
+    catalog_pop = evaluator.catalog_popularity(transform=pop_transform)
+    pop_mean = float(pops.mean())
+    pop_std = float(pops.std())
 
 
     # Print Jaccard-threshold results
@@ -277,11 +314,39 @@ def evaluate_system(evaluator, rs, k):
     print(f"MRR@{k}:       {mrrs_o.mean():.4f} | {mrrs_o.std():.4f}")
     print(f"nDCG@{k}:      {ndcgs_o.mean():.4f} | {ndcgs_o.std():.4f}")
 
-    # Print popularity TODO: Later include coverage here
-    print("\nPOPULARITY")
-    print("METRIC            MEAN   |  STD")
-    print("--------------------------------")
-    print(f"Pop@{k} (log1p): {pops.mean():.4f} | {pops.std():.4f}")
+    print("\nBEYOND-ACCURACY")
+    print("METRIC" + " " * 27 + "VALUE")
+    print("-" * 80)
+
+    cov_num = len(retrieved_union)
+    cov_den = len(evaluator.ids)
+    lift = pop_mean - catalog_pop
+    p25 = float(np.percentile(pops, 25))
+    p50 = float(np.median(pops))
+    p75 = float(np.percentile(pops, 75))
+
+    # left column width
+    L = 32
+
+    print(f"{f'Coverage@{k}:':<{L}} {coverage:>7.4f} ({cov_num} / {cov_den} songs)")
+    print(f"{f'Popularity@{k} ({pop_transform}):':<{L}} {pop_mean:>7.4f} (mean) | {pop_std:>7.4f} (std)")
+    print(f"{f'Catalog popularity ({pop_transform}):':<{L}} {catalog_pop:>7.4f}")
+    print(f"{'Popularity lift over catalog:':<{L}} {lift:>+7.4f} (Popularity@10 - CatalogPopularity)")
+    print(f"{'Popularity median:':<{L}} {p50:>7.4f}")
+    print(f"{'Popularity p25 / p75:':<{L}} {p25:>7.4f} / {p75:>7.4f}")
+
+
+    return {
+        "k": k,
+        "coverage": float(coverage),
+        "coverage_count": int(len(retrieved_union)),
+        "pop_mean": float(pop_mean),
+        "pop_std": float(pop_std),
+        "catalog_pop": float(catalog_pop),
+        "pop_lift": float(pop_mean - catalog_pop),
+    }
+
+
 
     # # Histograms
     # plot_hist(
@@ -310,9 +375,9 @@ def evaluate_system(evaluator, rs, k):
     # )
 
 
-'''
-Outsourced this to jupyter notebook -> delete code later 
 
+#Outsourced this to jupyter notebook -> delete code later 
+'''
 if __name__ == "__main__":
 
     from baseline import RandomBaselineRetrievalSystem
@@ -321,7 +386,7 @@ if __name__ == "__main__":
     from late_fusion import LateFusionRetrievalSystem
 
     data_dir = "./data"
-    k = 
+    k = 10
 
     evaluator = Evaluator(data_dir, jaccard_relevant_threshold=0.25)
 
@@ -333,7 +398,8 @@ if __name__ == "__main__":
     # 1) Random baseline
     banner("Random Baseline")
     rs = RandomBaselineRetrievalSystem(evaluator, seed=0)
-    evaluate_system(evaluator, rs, k=k)
+    evaluate_system(evaluator, rs, k=k, pop_transform="log1p")
+
 
     # 2) Unimodal (each modality)
     unimodal_rs = UnimodalRetrievalSystem(data_dir, evaluator)

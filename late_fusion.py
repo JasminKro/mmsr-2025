@@ -17,6 +17,8 @@ class LateFusionRetrievalSystem(UnimodalRetrievalSystem):
     Weighting (only for norm_sum):
       - weighting="equal": equal weights
       - weighting="auto": agreement-based weights (Jaccard overlap of TopL sets)
+
+    The UI calls the late fusion variant which returned the best accuracy (i.e., z-score + auto weighting)
     """
 
     def __init__(
@@ -24,9 +26,9 @@ class LateFusionRetrievalSystem(UnimodalRetrievalSystem):
         data_root,
         evaluator,
         modalities=None,
-        fusion="rrf",
+        fusion="norm_sum",
         norm="zscore",
-        weighting="equal",
+        weighting="auto",
         rrf_k=60,
         topL=200,
         alpha=2.0,
@@ -44,7 +46,7 @@ class LateFusionRetrievalSystem(UnimodalRetrievalSystem):
         self.alpha = float(alpha)
         self.eps = float(eps)
 
-    # rework later
+    # Compatibility work for UI 
     def set_modality(self, modality):
         """
         UI/Strategy compatibility:
@@ -210,11 +212,14 @@ class LateFusionRetrievalSystem(UnimodalRetrievalSystem):
     def retrieve(self, query_id, k_neighbors):
         rankings = self.rankings(query_id=query_id)
 
+        # UI-friendly scores in (0,1) to be comparable to cosine sim of other retrieval algorithms 
+        display_scores = 1.0 / (1.0 + np.exp(-rankings))
+
         # take top k+1 because query itself is often in the list
         top_indices = np.argsort(rankings)[::-1][:k_neighbors + 1].tolist()
 
         top_ids = [self.index_to_id[idx] for idx in top_indices]
-        top_scores = [float(rankings[idx]) for idx in top_indices]
+        top_scores = [float(display_scores[idx]) for idx in top_indices]
 
         # remove the query itself (and its score) if present
         if query_id in top_ids:
