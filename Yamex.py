@@ -130,6 +130,7 @@ retrieved_results = []
 search_history = []
 
 async def main(page: ft.Page):
+
     page.scroll = ft.ScrollMode.AUTO
     page.padding = 20
     page.bgcolor = ft.Colors.DEEP_PURPLE_900
@@ -177,6 +178,42 @@ async def main(page: ft.Page):
         expand=True
     )
 
+    search_field = ft.TextField(
+        hint_text="Search for a song title, an artist or an album",
+            hint_style=ft.TextStyle(color=ft.Colors.DEEP_PURPLE_800),
+            bgcolor=ft.Colors.WHITE,
+            border_radius=20,
+            border_width=1,
+            border_color = ft.Colors.DEEP_PURPLE_200,
+            color=ft.Colors.BLACK,
+            prefix_icon=ft.Icon(ft.Icons.SEARCH_ROUNDED, color=ft.Colors.DEEP_PURPLE_800),
+            expand=True
+    )
+
+    def on_search_change(e):
+        # check if search_field.border_width was set before
+        if search_field.border_width is not None and search_field.border_width > 1:
+            search_field.border_color = None  # take default border
+            search_field.border_width = 1  # reset standard border
+            search_field.update()
+
+    search_field.on_change = on_search_change
+    search_field.on_submit = lambda e: handle_search_now()
+
+    # text element to show query details
+    query_info_text = ft.Text("", color=ft.Colors.DEEP_PURPLE_100, weight=ft.FontWeight.W_500)
+
+    query_info_display = ft.Container(
+        content=ft.Row(
+            [query_info_icon := ft.Icon(ft.Icons.INFO_OUTLINE, color=ft.Colors.DEEP_PURPLE_200, size=20, visible=False),
+                query_info_text],
+            alignment=ft.MainAxisAlignment.CENTER,
+        ),
+        bgcolor=ft.Colors.TRANSPARENT,  # tansparent if no infos are shown
+        height=30,  # reserves space that info later needs
+        border_radius=10,
+    )
+
     slider_label = ft.Text(f"Number of results: {current_slider_value}", color=ft.Colors.WHITE)
 
     def handle_slider(e: ft.ControlEvent):#
@@ -189,6 +226,9 @@ async def main(page: ft.Page):
     def handle_dropdown_menu(e):
         global current_algorithm
         current_algorithm = dropdown_algorithm.value
+
+        if current_algorithm == RetrievalAlgorithms.RANDOM.value:
+            search_field.value = ""  # if another algorithm is selected, clear search field
 
         config = {
             RetrievalAlgorithms.RANDOM: [],
@@ -220,22 +260,6 @@ async def main(page: ft.Page):
                 dropdown_modality.value = allowed[0].value if allowed else None
         page.update()
 
-    def create_search_field(
-        hint_text: str = "Search for a song title, an artist or an album",
-        on_submit_callback=None
-    ):
-        return ft. TextField(
-            hint_text=hint_text,
-            hint_style=ft.TextStyle(color=ft.Colors.DEEP_PURPLE_800),
-            bgcolor=ft.Colors.WHITE,
-            border_radius=20,
-            color=ft.Colors.BLACK,
-            prefix_icon=ft.Icon(ft.Icons.SEARCH_ROUNDED, color=ft.Colors.DEEP_PURPLE_800),
-            expand=True,
-            on_submit = lambda e: on_submit_callback(e.control.value)
-                if on_submit_callback else None
-        )
-
     def log_text(content, weight=ft.FontWeight.NORMAL):
         return ft.Text(
             content,
@@ -245,34 +269,75 @@ async def main(page: ft.Page):
             color=ft.Colors.DEEP_PURPLE_50
         )
 
+    def reset_ui_displays():
+        # clear query infos
+        query_info_text.value = ""
+        query_info_text.spans = []
+        query_info_icon.visible = False
+        query_info_display.bgcolor = ft.Colors.TRANSPARENT
+
+        # clear metrics
+        for t in [precision_text, recall_text, mmr_text, ndcg_text]:
+            t.color = ft.Colors.TRANSPARENT
+        metrics_display.bgcolor = ft.Colors.TRANSPARENT
+        page.update()
+
     def handle_search_now(e=None):
+        if dropdown_algorithm.value == RetrievalAlgorithms.RANDOM.value:
+            search_field.value = ""
+            search_field.update()
+
         query = search_field.value.strip()
+        # Select the strategy based on the dropdown value
+        selected_algorithm = dropdown_algorithm.value
+        selected_modality = dropdown_modality.value
+        selected_modality_list = MODALITY_MAP.get(dropdown_modality.value)
+
+        # Validation of user input - if not valid drag attention of user to input field
+        if selected_algorithm != RetrievalAlgorithms.RANDOM.value and not query:
+            reset_ui_displays()
+            search_field.border_color = ft.Colors.RED_500  # to drag attention to the input field
+            search_field.border_width = 4
+            search_field.update()
+            return
+        else:
+            search_field.border_color = ft.Colors.DEEP_PURPLE_200  # usage of standard color again
+            search_field.border_width = 1
+            search_field.update()
+
         query_id = resolve_unimode_query_id(query)
 
         result_songs.controls.clear()
 
         if not query_id:
-            query_info_display.visible=False  # hide if search fails
+#            query_info_display.visible=False  # hide if search fails
+            reset_ui_displays()
+            result_songs.controls.clear()
             result_songs.controls.append(ft.Text("No results found for that query.", color="red"))
             page.update()
             return
 
-        # details for query
-        query_details = song_lookup_dict.get(query_id, {})
-        query_title = query_details.get("song", "Unknown")
-        query_artist = query_details.get("artist", "Unknown")
-        query_album = query_details.get("album_name", "Unknown")
+        # Reset of info board (no content, but keeps space)
+        query_info_text.value = ""
+        query_info_text.spans = []
+        query_info_icon.visible = False
+        query_info_display.bgcolor = ft.Colors.TRANSPARENT
 
-        # Update the new display
-        query_info_text.value = f"Query Info: {query_title} by {query_artist}, {query_album} | id: {query_id}"
-        query_info_display.visible = True
+        if query_id and dropdown_algorithm.value != RetrievalAlgorithms.RANDOM.value:
+            # activate only if not random algorithm is selected
+            q_details = song_lookup_dict.get(query_id, {})
 
-        results_title.visible = False
+            query_info_text.spans = [
+                ft.TextSpan(f"Query: ", ft.TextStyle(weight=ft.FontWeight.BOLD, color=ft.Colors.DEEP_PURPLE_200)),
+                ft.TextSpan(f"{q_details.get('song', 'Unknown')} "
+                            f"by {q_details.get('artist', 'Unknown')} "
+                            f"from {q_details.get('album', 'Unknown')} "),
+#                ft.TextSpan(f" [ID: {query_id}]", ft.TextStyle(size=11, color=ft.Colors.DEEP_PURPLE_300)),
+            ]
+            query_info_icon.visible = True
+            query_info_display.bgcolor = ft.Colors.DEEP_PURPLE_800
 
-        # Select the strategy based on the dropdown value
-        selected_algorithm = dropdown_algorithm.value
-        selected_modality = dropdown_modality.value
-        selected_modality_list = MODALITY_MAP.get(dropdown_modality.value)
+        page.update()
 
         if selected_algorithm == RetrievalAlgorithms.RANDOM:
             strategy = RandomStrategy(random_rs)
@@ -317,8 +382,8 @@ async def main(page: ft.Page):
 
         # execute search
         ids, raw_metrics, scores = strategy.search(query_id, current_slider_value)
-        print(f"DEBUG: scores: {scores}")
-        print(f"DEBUG: metrics: {raw_metrics}")
+#        print(f"DEBUG: scores: {scores}")
+#        print(f"DEBUG: metrics: {raw_metrics}")
 
         # 1. Store cleaned metrics in a dictionary (from numpy type to standard)
         current_metrics = {
@@ -331,12 +396,16 @@ async def main(page: ft.Page):
         }
         print(current_metrics)
         # 2. Update the UI using your dictionary
-        precision_text.value = f"Precision@{current_slider_value}: {current_metrics['precision']:.4f}  "
-        recall_text.value = f"  Recall@{current_slider_value}: {current_metrics['recall']:.4f}  "
-        mmr_text.value = f"  MRR@{current_slider_value}:  {current_metrics['mrr']:.4f}  "
-        ndcg_text.value = f"  nDCG@{current_slider_value}:  {current_metrics['ndcg']:.4f}"
+        precision_text.value = f"Precision@{current_slider_value}: {current_metrics['precision']:.4f}"
+        precision_text.color = ft.Colors.WHITE
+        recall_text.value = f"Recall@{current_slider_value}: {current_metrics['recall']:.4f}"
+        recall_text.color = ft.Colors.WHITE
+        mmr_text.value = f"MRR@{current_slider_value}:  {current_metrics['mrr']:.4f}"
+        mmr_text.color = ft.Colors.WHITE
+        ndcg_text.value = f"nDCG@{current_slider_value}:  {current_metrics['ndcg']:.4f}"
+        ndcg_text.color = ft.Colors.WHITE
+        metrics_display.bgcolor = ft.Colors.DEEP_PURPLE_800
 
-        metrics_display.visible=True
         search_history.append(current_metrics)
 
         algo_abbr = ALGO_ABBREVIATIONS.get(dropdown_algorithm.value, "-")
@@ -473,12 +542,10 @@ async def main(page: ft.Page):
             ], scroll=ft.ScrollMode.AUTO)
         page.update()
 
-    search_field = create_search_field(on_submit_callback=handle_search_now)
-
     results_slider = ft.Slider(
         min=1,
-        max=100,
-        divisions=20,  # for step size of 5
+        max=250,
+        divisions=25,  # for step size of 10
         value=current_slider_value,
 #        label="{value}",
         on_change=handle_slider,
@@ -511,7 +578,7 @@ async def main(page: ft.Page):
         filled=True,
         fill_color=ft.Colors.DEEP_PURPLE_800,
         trailing_icon=ft.Icon(ft.Icons.ARROW_DROP_DOWN, color=ft.Colors.WHITE),
-        width = 300
+        width = 260
     )
 
     dropdown_modality = ft.Dropdown(
@@ -528,7 +595,7 @@ async def main(page: ft.Page):
         filled=True,
         fill_color=ft.Colors.DEEP_PURPLE_800,
         trailing_icon=ft.Icon(ft.Icons.ARROW_DROP_DOWN, color=ft.Colors.WHITE),
-        width = 300
+        width = 260
     )
 
     search_button = ft.Button(
@@ -577,7 +644,7 @@ async def main(page: ft.Page):
             ),
             ft.Container(
                 content=dropdown_modality,
-                col={"xs": 12, "md": 2},
+                col={"xs": 12, "md": 1.8},
             ),
             ft.Container(
                 content=search_button,
@@ -588,30 +655,21 @@ async def main(page: ft.Page):
         spacing=20
     )
 
-    # text element to show query details
-    query_info_text = ft.Text("", color=ft.Colors.DEEP_PURPLE_100, weight=ft.FontWeight.W_500)
-
-    query_info_display = ft.Container(
-        content=ft.Row(
-            [ft.Icon(ft.Icons.INFO_OUTLINE, color=ft.Colors.DEEP_PURPLE_200, size=20),
-                query_info_text],
-            alignment=ft.MainAxisAlignment.CENTER,
-        ),
-        visible=False  # Hidden until a search happens
-    )
-
-    precision_text = ft.Text("Precision: --", color=ft.Colors.WHITE)
-    recall_text = ft.Text("Recall: --", color=ft.Colors.WHITE)
-    mmr_text = ft.Text("MRR: --", color=ft.Colors.WHITE)
-    ndcg_text = ft.Text("nDCG: --", color=ft.Colors.WHITE)
+    # text elements to show evaluation matrics
+    precision_text = ft.Text("Precision: --", color=ft.Colors.TRANSPARENT)
+    recall_text = ft.Text("Recall: --", color=ft.Colors.TRANSPARENT)
+    mmr_text = ft.Text("MRR: --", color=ft.Colors.TRANSPARENT)
+    ndcg_text = ft.Text("nDCG: --", color=ft.Colors.TRANSPARENT)
 
     metrics_display = ft.Container(
         content=ft.Row(
             [precision_text, recall_text, mmr_text, ndcg_text],
             alignment=ft.MainAxisAlignment.CENTER,
+            spacing=30
         ),
-        bgcolor=ft.Colors.DEEP_PURPLE_800,
-        visible=False  # hidden by default
+        bgcolor=ft.Colors.TRANSPARENT,  # transparent if no matrics shown to keep space
+        border_radius=10,
+        height=30  # same height as query info for symmetry
     )
 
     result_songs = ft.Column(
@@ -619,7 +677,7 @@ async def main(page: ft.Page):
         expand=True,
     )
 
-    results_title = ft.Text("Top Results shown after seach...", color=ft.Colors.WHITE)
+    results_title = ft.Text("Top Results shown after search...", color=ft.Colors.WHITE)
 
     intermediate_results_container = ft.Container(
         content=ft.Column([
@@ -636,7 +694,7 @@ async def main(page: ft.Page):
     )
 
     result_container = ft.Container(
-        content=ft.Text("For details, click on a song :-)", color=ft.Colors.WHITE),
+        content=ft.Text("Click on a song on the left to view details :-)", color=ft.Colors.WHITE),
         padding=15,
         border=ft.Border.all(1, ft.Colors.DEEP_PURPLE_200),
         border_radius=20,
@@ -698,12 +756,14 @@ async def main(page: ft.Page):
             controls=[
                 title,
                 control_grid,
-                query_info_display,
-                metrics_display,
+                ft.Column([
+                    query_info_display,
+                    metrics_display,
+                ], spacing=5),  # overrule the global setting for less space
                 result_row
             ],
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-            spacing=25,
+            spacing=25,  # global setting between container
             expand=True
         )
     )

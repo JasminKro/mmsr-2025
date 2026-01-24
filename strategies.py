@@ -36,6 +36,8 @@ class RandomStrategy(RetrievalStrategy):
 
     def search(self, query_id, k):
         ids, metrics, scores = self.rs.retrieve(query_id=query_id, k_neighbors=k)
+        print(ids, metrics, scores)
+        return ids, metrics, scores
         #ids, metrics, scores = random.sample(self.all_ids, min(k, len(self.all_ids)))
         return ids, metrics, scores
 
