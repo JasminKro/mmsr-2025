@@ -7,10 +7,11 @@ from enum import Enum
 from flet import UrlLauncher
 
 from baseline import RandomBaselineRetrievalSystem
-from strategies import EarlyFusionStrategy, LateFusionStrategy, RandomStrategy, UnimodalStrategy
+from strategies import *
 from unimodal import UnimodalRetrievalSystem, Evaluator
 from early_fusion import EarlyFusionRetrievalSystem
 from late_fusion import LateFusionRetrievalSystem
+from nn_based import NeuralNetworkBasedRetrievalSystem
 
 class RetrievalAlgorithms(str, Enum):
     RANDOM = "random"
@@ -19,33 +20,9 @@ class RetrievalAlgorithms(str, Enum):
     LATE_FUSION = "late_fusion"
     NEUTRAL_NETWORK = "neutral_network"
 
-class Modality(str, Enum):
-    AUDIO = "audio"
-    LYRICS = "lyrics"
-    VIDEO = "video"
-    AUDIO_AUDIO = "audio_audio"
-    AUDIO_LYRICS = "audio_lyrics"
-    AUDIO_VIDEO = "audio_video"
-    LYRICS_LYRICS = "lyrics_lyrics"
-    LYRICS_AUDIO = "lyrics_audio"
-    LYRICS_VIDEO = "lyrics_video"
-    VIDEO_AUDIO = "video_audio"
-    VIDEO_LYRICS = "video_lyrics"
-    VIDEO_VIDEO = "video_video"
-    ALL = "audio_lyrics_video"
-
-# helper directory
-MODALITY_MAP = {
-    Modality.AUDIO: ["audio"],
-    Modality.LYRICS: ["lyrics"],
-    Modality.VIDEO: ["video"],
-    Modality.AUDIO_LYRICS: ["audio", "lyrics"],
-    Modality.AUDIO_VIDEO: ["audio", "video"],
-    Modality.LYRICS_VIDEO: ["lyrics", "video"],
-    Modality.ALL: ["audio", "lyrics", "video"]
-}
 
 DATA_ROOT = "./data"
+NN_DATA_ROOT = "./data_nn/NN_pretrained_models_and_features/"
 id_information_df = pd.read_csv(f"{DATA_ROOT}/id_information_mmsr.tsv", sep="\t")
 id_genres_df = pd.read_csv(f"{DATA_ROOT}/id_genres_mmsr.tsv", sep="\t")
 id_url_df = pd.read_csv(f"{DATA_ROOT}/id_url_mmsr.tsv", sep="\t")
@@ -64,13 +41,13 @@ evaluator = Evaluator(DATA_ROOT)
 random_rs = RandomBaselineRetrievalSystem(evaluator, seed=None)
 unimodal_rs = UnimodalRetrievalSystem(DATA_ROOT, evaluator)
 
-
-# Early Fusion Pre-Initialization of all combinations
+# Early fusion, late fusion and neural-network based pre-Initialization of all combinations
 # it takes long to load at starting program, but it enables a quick search for user
 EARLY_FUSION_SYSTEMS = {}
 LATE_FUSION_SYSTEMS = {}
+NN_SYSTEMS = {}
 
-MULTIMODAL_MODALITIES = {
+FUSION_MODALITIES = {
     Modality.AUDIO_LYRICS: ["audio", "lyrics"],
     Modality.AUDIO_VIDEO: ["audio", "video"],
     Modality.LYRICS_VIDEO: ["lyrics", "video"],
@@ -78,7 +55,7 @@ MULTIMODAL_MODALITIES = {
 }
 
 
-for modality, modality_list in MULTIMODAL_MODALITIES.items():
+for modality, modality_list in FUSION_MODALITIES.items():
     # Early fusion
     try:
         EARLY_FUSION_SYSTEMS[modality] = EarlyFusionRetrievalSystem(
@@ -97,6 +74,25 @@ for modality, modality_list in MULTIMODAL_MODALITIES.items():
         )
     except Exception as e:
         print(f"Late fusion init failed for {modality}: {e}")
+
+
+NN_MODALITIES = [
+    Modality.AUDIO_AUDIO, Modality.AUDIO_LYRICS, Modality.AUDIO_VIDEO,
+    Modality.LYRICS_AUDIO, Modality.LYRICS_LYRICS, Modality.LYRICS_VIDEO,
+    Modality.VIDEO_AUDIO, Modality.VIDEO_LYRICS, Modality.VIDEO_VIDEO
+]
+
+for modality in NN_MODALITIES:
+    try:
+        query_mod, result_mod = MODALITY_MAP[modality]  # to separate in input and output modality
+        NN_SYSTEMS[modality] = NeuralNetworkBasedRetrievalSystem(
+            data_root=NN_DATA_ROOT,
+            evaluator=evaluator,
+            query_modality=query_mod,
+            result_modality=result_mod
+        )
+    except Exception as e:
+        print(f"Neural-Network based retrieval system init failed for {modality}: {e}")
 
 
 ALGO_ABBREVIATIONS = {
@@ -349,32 +345,35 @@ async def main(page: ft.Page):
 
         elif selected_algorithm == RetrievalAlgorithms.EARLY_FUSION:
             ef_rs = EARLY_FUSION_SYSTEMS.get(selected_modality)
-
             if ef_rs is None:
                 result_songs.controls.append(
-                    ft.Text("Selected modality not supported for Early Fusion", color="yellow")
+                    ft.Text("Early Fusion is currently not loaded and is unavailable", color="yellow")
                 )
                 page.update()
                 return
-
             strategy = EarlyFusionStrategy(ef_rs, selected_modality)
             print(selected_algorithm, selected_modality_list)
 
         elif selected_algorithm == RetrievalAlgorithms.LATE_FUSION:
             lf_rs = LATE_FUSION_SYSTEMS.get(selected_modality)
-
             if lf_rs is None:
                 result_songs.controls.append(
-                    ft.Text("Selected modality not supported for Late Fusion", color="yellow")
+                    ft.Text("Late Fusion is currently not loaded and is unavailable", color="yellow")
                 )
                 page.update()
                 return
-
             strategy = LateFusionStrategy(lf_rs, selected_modality)
             print(selected_algorithm, selected_modality_list)
 
-
-
+        elif selected_algorithm == RetrievalAlgorithms.NEUTRAL_NETWORK:
+            nn_rs = NN_SYSTEMS.get(selected_modality)
+            if nn_rs is None:
+                result_songs.controls.append(
+                    ft.Text("Neural Network is currently not loaded and is unavailable.", color="yellow")
+                )
+                page.update()
+                return
+            strategy = NeuralNetworkStrategy(nn_rs, selected_modality)
         else:
             result_songs.controls.append(ft.Text("Not implemented yet", color="yellow"))
             page.update()
@@ -610,7 +609,7 @@ async def main(page: ft.Page):
         ),
         on_click=handle_search_now,
         color=ft.Colors.WHITE,
-        bgcolor=ft.Colors.DEEP_PURPLE_100,
+        bgcolor=ft.Colors.WHITE,
         style=ft.ButtonStyle(
             shape=ft.RoundedRectangleBorder(radius=20),
             side=ft.BorderSide(
@@ -689,7 +688,7 @@ async def main(page: ft.Page):
         border_radius=20,
         expand=True,
         alignment=ft.Alignment.TOP_LEFT,
-        height=740,
+        height=700,
         col={"xs": 12, "md": 4}  # xs = small monitor: full width, md = medium = 4 of 12 colums width
     )
 
@@ -700,7 +699,7 @@ async def main(page: ft.Page):
         border_radius=20,
         expand=True,
         alignment=ft.Alignment.TOP_LEFT,
-        height=740,
+        height=700,
         col={"xs": 12, "md": 5}
     )
 
