@@ -1,10 +1,12 @@
 import flet as ft
 import flet_video as fv
 import pandas as pd
+import random
 
 from enum import Enum
 
 from flet import UrlLauncher
+from networkx.algorithms.smallworld import random_reference
 
 from baseline import RandomBaselineRetrievalSystem
 from strategies import *
@@ -54,7 +56,7 @@ FUSION_MODALITIES = {
     Modality.ALL: ["audio", "lyrics", "video"],
 }
 
-
+"""
 for modality, modality_list in FUSION_MODALITIES.items():
     # Early fusion
     try:
@@ -74,7 +76,7 @@ for modality, modality_list in FUSION_MODALITIES.items():
         )
     except Exception as e:
         print(f"Late fusion init failed for {modality}: {e}")
-
+"""
 
 NN_MODALITIES = [
     Modality.AUDIO_AUDIO, Modality.AUDIO_LYRICS, Modality.AUDIO_VIDEO,
@@ -199,14 +201,29 @@ async def main(page: ft.Page):
     # text element to show query details
     query_info_text = ft.Text("", color=ft.Colors.DEEP_PURPLE_100, weight=ft.FontWeight.W_500)
 
+    dropdown_matching_songs = ft.Dropdown(
+        label="Matching songs",
+        label_style=ft.TextStyle(color=ft.Colors.WHITE),
+        color=ft.Colors.WHITE,
+        bgcolor=ft.Colors.DEEP_PURPLE_700,
+        border_color=ft.Colors.DEEP_PURPLE_200,
+        border_radius=20,
+        width=600,
+        visible=True,
+        on_select=lambda e: execute_retrieval(dropdown_matching_songs.value),
+    )
+
     query_info_display = ft.Container(
         content=ft.Row(
-            [query_info_icon := ft.Icon(ft.Icons.INFO_OUTLINE, color=ft.Colors.DEEP_PURPLE_200, size=20, visible=False),
-                query_info_text],
-            alignment=ft.MainAxisAlignment.CENTER,
+            [
+                query_info_icon := ft.Icon(ft.Icons.INFO_OUTLINE, color=ft.Colors.DEEP_PURPLE_200, size=20, visible=False),
+                dropdown_matching_songs
+            ],
+            alignment=ft.MainAxisAlignment.CENTER,  # horizontal centering
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,  # vertical centering
         ),
         bgcolor=ft.Colors.TRANSPARENT,  # tansparent if no infos are shown
-        height=30,  # reserves space that info later needs
+        height=70,  # reserves space that info later needs
         border_radius=10,
     )
 
@@ -219,12 +236,19 @@ async def main(page: ft.Page):
         slider_label.value = f" Number of results: {current_slider_value}"
         page.update()
 
-    def handle_dropdown_menu(e):
+    def handle_dropdown_algo_and_mod(e):
         global current_algorithm
         current_algorithm = dropdown_algorithm.value
 
         if current_algorithm == RetrievalAlgorithms.RANDOM.value:
             search_field.value = ""  # if another algorithm is selected, clear search field
+            dropdown_matching_songs.disabled = True
+            dropdown_matching_songs.label = "Selection not possible with random algorithm"
+            dropdown_matching_songs.options = []
+            query_info_icon.visible = True
+        else:
+            dropdown_matching_songs.disabled = False
+            dropdown_matching_songs.label = "Matching songs"
 
         config = {
             RetrievalAlgorithms.RANDOM: [],
@@ -279,15 +303,16 @@ async def main(page: ft.Page):
         page.update()
 
     def handle_search_now(e=None):
-        if dropdown_algorithm.value == RetrievalAlgorithms.RANDOM.value:
+        selected_algorithm = dropdown_algorithm.value
+
+        if selected_algorithm == RetrievalAlgorithms.RANDOM.value:
             search_field.value = ""
             search_field.update()
+            random_id = random.choice(list(song_lookup_dict.keys()))  # random query_id for Evaluator
+            execute_retrieval(random_id)
+            return
 
         query = search_field.value.strip()
-        # Select the strategy based on the dropdown value
-        selected_algorithm = dropdown_algorithm.value
-        selected_modality = dropdown_modality.value
-        selected_modality_list = MODALITY_MAP.get(dropdown_modality.value)
 
         # Validation of user input - if not valid drag attention of user to input field
         if selected_algorithm != RetrievalAlgorithms.RANDOM.value and not query:
@@ -301,17 +326,43 @@ async def main(page: ft.Page):
             search_field.border_width = 1
             search_field.update()
 
-        query_id = resolve_unimode_query_id(query)
+        # Match finding
+        matches = resolve_query_id(query)
 
-        result_songs.controls.clear()
-
-        if not query_id:
-#            query_info_display.visible=False  # hide if search fails
+        # Get all songs that matches the query
+        if not matches and dropdown_algorithm.value != RetrievalAlgorithms.RANDOM.value:
             reset_ui_displays()
             result_songs.controls.clear()
             result_songs.controls.append(ft.Text("No results found for that query.", color="red"))
             page.update()
             return
+
+        # Update dropdown options (fill options with matching songs)
+        dropdown_matching_songs.options = [
+            ft.dropdown.Option(m["id"], m["display"]) for m in matches
+        ]
+
+        if matches:
+            dropdown_matching_songs.value = matches[0]["id"]  # Default selection
+            dropdown_matching_songs.visible = True
+            query_info_display.bgcolor = ft.Colors.DEEP_PURPLE_800
+            execute_retrieval(dropdown_matching_songs.value)  # as default trigger retrieval with first matching song
+        else:
+            #first_id = list(song_lookup_dict.keys())[0]  # evaluate against the first id in database
+            #execute_retrieval(first_id)
+            random_id = random.choice(list(song_lookup_dict.keys())) # pick a random id for the evaluator
+            execute_retrieval(random_id)
+
+
+    def execute_retrieval(selected_id):
+        # Select the strategy based on the dropdown value
+        selected_algorithm = dropdown_algorithm.value
+        selected_modality = dropdown_modality.value
+        selected_modality_list = MODALITY_MAP.get(dropdown_modality.value)
+
+#       query_id = resolve_query_id(query)
+
+        result_songs.controls.clear()
 
         # Reset of info board (no content, but keeps space)
         query_info_text.value = ""
@@ -319,10 +370,9 @@ async def main(page: ft.Page):
         query_info_icon.visible = False
         query_info_display.bgcolor = ft.Colors.TRANSPARENT
 
-        if query_id and dropdown_algorithm.value != RetrievalAlgorithms.RANDOM.value:
+        if selected_id and dropdown_algorithm.value != RetrievalAlgorithms.RANDOM.value:
             # activate only if not random algorithm is selected
-            q_details = song_lookup_dict.get(query_id, {})
-
+            q_details = song_lookup_dict.get(selected_id, {})
             query_info_text.spans = [
                 ft.TextSpan(f"Query: ", ft.TextStyle(weight=ft.FontWeight.BOLD, color=ft.Colors.DEEP_PURPLE_200)),
                 ft.TextSpan(f"{q_details.get('song', 'Unknown')} "
@@ -332,6 +382,11 @@ async def main(page: ft.Page):
             ]
             query_info_icon.visible = True
             query_info_display.bgcolor = ft.Colors.DEEP_PURPLE_800
+        elif selected_algorithm == RetrievalAlgorithms.RANDOM.value:
+            query_info_text.value = "Random Baseline Search"
+            query_info_icon.visible = False
+            query_info_display.bgcolor = ft.Colors.DEEP_PURPLE_800
+
 
         page.update()
 
@@ -380,7 +435,7 @@ async def main(page: ft.Page):
             return
 
         # execute search
-        ids, raw_metrics, scores = strategy.search(query_id, current_slider_value)
+        ids, raw_metrics, scores = strategy.search(selected_id, current_slider_value)
 #        print(f"DEBUG: scores: {scores}")
 #        print(f"DEBUG: metrics: {raw_metrics}")
 
@@ -459,11 +514,11 @@ async def main(page: ft.Page):
 
         page.update()
 
-    def find_id(query: str, column: str):
-        found = id_information_df[id_information_df[column].str.contains(query, case=False, na=False, regex=False)]
-        return found.iloc[0]["id"] if not found.empty else None
+#    def find_id(query: str, column: str):
+#        found = id_information_df[id_information_df[column].str.contains(query, case=False, na=False, regex=False)]
+#        return found.iloc[0]["id"] if not found.empty else None
 
-    def resolve_unimode_query_id(query):
+    def resolve_query_id(query):
         query = query.lower()
         # Search across song, artist, and album_name simultaneously
         mask = (
@@ -472,7 +527,14 @@ async def main(page: ft.Page):
                 master_df["album_name"].str.contains(query, case=False, na=False)
         )
         found = master_df[mask]
-        return found.iloc[0]["id"] if not found.empty else None
+
+        results = []
+        for _, row in found.iterrows():
+            results.append({
+                "id": row["id"],
+                "display": f"{row['song']} by ({row['artist']}) from ({row['album_name']})"
+            })
+        return results
 
     def on_song_click(song_data):
         video_url = song_data.get("url", "")
@@ -542,11 +604,10 @@ async def main(page: ft.Page):
         page.update()
 
     results_slider = ft.Slider(
-        min=1,
-        max=250,
-        divisions=25,  # for step size of 10
+        min=5,
+        max=200,
+        divisions=39,  # for step size of 5 -> (max-min)/step size = (200-5)/5=39
         value=current_slider_value,
-#        label="{value}",
         on_change=handle_slider,
         expand=True
     )
@@ -570,7 +631,7 @@ async def main(page: ft.Page):
             ft.dropdown.Option(RetrievalAlgorithms.LATE_FUSION.value, "Multimodal - Late fusion"),
             ft.dropdown.Option(RetrievalAlgorithms.NEUTRAL_NETWORK.value, "Neural-Network based")
         ],
-        on_select=handle_dropdown_menu,
+        on_select=handle_dropdown_algo_and_mod,
         border_radius=20,
         bgcolor=ft.Colors.DEEP_PURPLE_700,
         border_color=ft.Colors.DEEP_PURPLE_200,
@@ -587,7 +648,7 @@ async def main(page: ft.Page):
         value=None,  # start value
         options=[],
         disabled=True,
-        on_select=handle_dropdown_menu,
+        on_select=handle_dropdown_algo_and_mod,
         border_radius=20,
         bgcolor=ft.Colors.DEEP_PURPLE_700,
         border_color=ft.Colors.DEEP_PURPLE_200,
@@ -668,7 +729,7 @@ async def main(page: ft.Page):
         ),
         bgcolor=ft.Colors.TRANSPARENT,  # transparent if no matrics shown to keep space
         border_radius=10,
-        height=30  # same height as query info for symmetry
+        height=30
     )
 
     result_songs = ft.Column(
@@ -688,7 +749,7 @@ async def main(page: ft.Page):
         border_radius=20,
         expand=True,
         alignment=ft.Alignment.TOP_LEFT,
-        height=700,
+        height=660,
         col={"xs": 12, "md": 4}  # xs = small monitor: full width, md = medium = 4 of 12 colums width
     )
 
@@ -699,7 +760,7 @@ async def main(page: ft.Page):
         border_radius=20,
         expand=True,
         alignment=ft.Alignment.TOP_LEFT,
-        height=700,
+        height=660,
         col={"xs": 12, "md": 5}
     )
 
@@ -766,7 +827,7 @@ async def main(page: ft.Page):
             expand=True
         )
     )
-    handle_dropdown_menu(None)
+    handle_dropdown_algo_and_mod(None)
 
 ft.run(main)  # open YAMEx in a separate window
 #ft.run(main, view=ft.AppView.WEB_BROWSER) # opens YAMEx in browser
