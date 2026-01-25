@@ -21,6 +21,7 @@ class RetrievalAlgorithms(str, Enum):
 
 DATA_ROOT = "./data"
 NN_DATA_ROOT = "./data_nn/NN_pretrained_models_and_features/"
+FIXED_CONTAINER_HEIGHT = 660
 id_information_df = pd.read_csv(f"{DATA_ROOT}/id_information_mmsr.tsv", sep="\t")
 id_genres_df = pd.read_csv(f"{DATA_ROOT}/id_genres_mmsr.tsv", sep="\t")
 id_url_df = pd.read_csv(f"{DATA_ROOT}/id_url_mmsr.tsv", sep="\t")
@@ -173,7 +174,7 @@ async def main(page: ft.Page):
     )
 
     search_field = ft.TextField(
-        hint_text="Search for a song title, an artist or an album",
+        hint_text="Search for a song title, artist, or album...",
             hint_style=ft.TextStyle(color=ft.Colors.DEEP_PURPLE_900),
             bgcolor=ft.Colors.WHITE,
             border_radius=20,
@@ -210,7 +211,7 @@ async def main(page: ft.Page):
         border_radius=20,
         width=600,
         visible=True,
-        on_select=lambda e: execute_retrieval(dropdown_matching_songs.value)
+        on_select=lambda e: execute_retrieval(dropdown_matching_songs.value),
     )
 
     query_info_display = ft.Container(
@@ -227,7 +228,12 @@ async def main(page: ft.Page):
         border_radius=10,
     )
 
-    slider_label = ft.Text(f"Number of results: {current_slider_value}", color=ft.Colors.WHITE)
+    slider_label = ft.Text(
+        f"Number of results: {current_slider_value}",
+        color=ft.Colors.WHITE,
+        width=180,  # fixed width of label so slider does not get narrower with multi-digit number
+        no_wrap=True
+    )
 
     def handle_slider(e: ft.ControlEvent):#
         global current_slider_value
@@ -284,11 +290,8 @@ async def main(page: ft.Page):
         if current_algorithm == RetrievalAlgorithms.RANDOM.value:
             random_id = random.choice(list(song_lookup_dict.keys())) # pick a random id for the evaluator
             execute_retrieval(random_id)
-        elif dropdown_matching_songs.value and current_algorithm != RetrievalAlgorithms.RANDOM.value:
+        elif dropdown_matching_songs.value:  # fire new search after changing algorithm or modality
             execute_retrieval(dropdown_matching_songs.value)
-        elif dropdown_matching_songs.value and current_modality != dropdown_modality.value:
-            execute_retrieval(dropdown_matching_songs.value)
-
         page.update()
 
     def log_text(content, weight=ft.FontWeight.NORMAL):
@@ -328,8 +331,8 @@ async def main(page: ft.Page):
         # Validation of user input - if not valid drag attention of user to input field
         if selected_algorithm != RetrievalAlgorithms.RANDOM.value and not query:
             reset_ui_displays()
-            search_field.bgcolor = ft.Colors.DEEP_ORANGE_100
-            search_field.border_color = ft.Colors.DEEP_ORANGE_400  # to drag attention to the input field
+            search_field.bgcolor = ft.Colors.AMBER_50
+            search_field.border_color = ft.Colors.AMBER_600  # to drag attention to the input field
             search_field.border_width = 4
             search_field.update()
             return
@@ -347,7 +350,7 @@ async def main(page: ft.Page):
             reset_ui_displays()
             result_songs.controls.clear()
             result_songs.controls.append(ft.Text("Sorry, no results were found for your query.",
-                                                 color=ft.Colors.DEEP_ORANGE_400,
+                                                 color=ft.Colors.AMBER_400,
                                                  weight=ft.FontWeight.BOLD,
                                                  size=20
                                                  ))
@@ -470,13 +473,13 @@ async def main(page: ft.Page):
         }
         print(current_metrics)
         # 2. Update the UI using your dictionary
-        precision_text.value = f"Precision@{current_slider_value}: {current_metrics['precision']:.4f}"
+        precision_text.value = f"Precision@{current_slider_value:<3}: {current_metrics['precision']:.4f}"
         precision_text.color = ft.Colors.WHITE
-        recall_text.value = f"Recall@{current_slider_value}: {current_metrics['recall']:.4f}"
+        recall_text.value = f"Recall@{current_slider_value:<3}: {current_metrics['recall']:.4f}"
         recall_text.color = ft.Colors.WHITE
-        mmr_text.value = f"MRR@{current_slider_value}:  {current_metrics['mrr']:.4f}"
+        mmr_text.value = f"MRR@{current_slider_value:<3}: {current_metrics['mrr']:.4f}"
         mmr_text.color = ft.Colors.WHITE
-        ndcg_text.value = f"nDCG@{current_slider_value}:  {current_metrics['ndcg']:.4f}"
+        ndcg_text.value = f"nDCG@{current_slider_value:<3}: {current_metrics['ndcg']:.4f}"
         ndcg_text.color = ft.Colors.WHITE
         metrics_display.bgcolor = ft.Colors.DEEP_PURPLE_800
 
@@ -588,8 +591,7 @@ async def main(page: ft.Page):
             playlist=[fv.VideoMedia(embed_url)],
             aspect_ratio=16 / 9,
             autoplay=False,
-            # essential for Linux:
-            show_controls=True,
+            show_controls=True  # essential for Linux
         )
 
         async def handle_open_link(e):
@@ -620,14 +622,16 @@ async def main(page: ft.Page):
                 border=ft.Border.all(1, ft.Colors.DEEP_PURPLE_200),
                 border_radius=10,
                 padding=10,
+                align=ft.Alignment.CENTER,
+                height=350  # max px height of video container
             )
             ], scroll=ft.ScrollMode.AUTO)
         page.update()
 
     results_slider = ft.Slider(
-        min=5,
+        min=1,
         max=200,
-        divisions=39,  # for step size of 5 -> (max-min)/step size = (200-5)/5=39
+        divisions=40,  # for step size of 5 -> (max-min)/step size = (200-5)/5=39
         value=current_slider_value,
         on_change=handle_slider,
         expand=True
@@ -637,7 +641,8 @@ async def main(page: ft.Page):
         controls=[
             slider_label,
             results_slider
-        ]
+        ],
+#        spacing=10  # space between label and slider
     )
 
     dropdown_algorithm = ft.Dropdown(
@@ -737,10 +742,15 @@ async def main(page: ft.Page):
     )
 
     # text elements to show evaluation matrics
-    precision_text = ft.Text("Precision: --", color=ft.Colors.TRANSPARENT)
-    recall_text = ft.Text("Recall: --", color=ft.Colors.TRANSPARENT)
-    mmr_text = ft.Text("MRR: --", color=ft.Colors.TRANSPARENT)
-    ndcg_text = ft.Text("nDCG: --", color=ft.Colors.TRANSPARENT)
+    precision_text = ft.Text(font_family="monospace", size=13)
+    recall_text = ft.Text(font_family="monospace", size=13)
+    mmr_text = ft.Text(font_family="monospace", size=13)
+    ndcg_text = ft.Text(font_family="monospace", size=13)
+
+#    precision_text = ft.Text("Precision: --", color=ft.Colors.TRANSPARENT)
+#    recall_text = ft.Text("Recall: --", color=ft.Colors.TRANSPARENT)
+#    mmr_text = ft.Text("MRR: --", color=ft.Colors.TRANSPARENT)
+#    ndcg_text = ft.Text("nDCG: --", color=ft.Colors.TRANSPARENT)
 
     metrics_display = ft.Container(
         content=ft.Row(
@@ -772,7 +782,7 @@ async def main(page: ft.Page):
         border_radius=20,
         expand=True,
         alignment=ft.Alignment.TOP_LEFT,
-        height=660,
+        height=FIXED_CONTAINER_HEIGHT,
         col={"xs": 12, "md": 4}  # xs = small monitor: full width, md = medium = 4 of 12 colums width
     )
 
@@ -783,44 +793,71 @@ async def main(page: ft.Page):
         border_radius=20,
         expand=True,
         alignment=ft.Alignment.TOP_LEFT,
-        height=660,
-        col={"xs": 12, "md": 5}
+        height=FIXED_CONTAINER_HEIGHT,
+        col={"xs": 12, "md": 5.5}
     )
 
+    def clear_history_log(e):
+        history_column.controls.clear()
+        search_history.clear()
+#        history_log_container.visible = False  # hides the log container again
+        page.update()
+
     history_column = ft.Column()
+
     history_log_container = ft.Container(
-        content=ft.Column([
-            ft.Text("Comparison Log: ", weight="bold"),
-            ft.Divider(color=ft.Colors.DEEP_PURPLE_200, height=1),
-            ft.Row(
-                controls=[
-                    ft.Column(
-                        controls=[
-                            ft.Row([
-                            # header
-                            ft.Container(content=log_text("ALGO", ft.FontWeight.BOLD), width=50),
-                            ft.Container(content=log_text("MOD", ft.FontWeight.BOLD), width=40),
-                            ft.Container(content=log_text("PREC", ft.FontWeight.BOLD), width=45),
-                            ft.Container(content=log_text("RECL", ft.FontWeight.BOLD), width=45),
-                            ft.Container(content=log_text("MRR", ft.FontWeight.BOLD), width=45),
-                            ft.Container(content=log_text("nDCG", ft.FontWeight.BOLD), width=45),
-                        ], spacing=10),
-                        ft.Divider(color=ft.Colors.DEEP_PURPLE_200, height=1),
-                        # data rows
-                        history_column,
-                        ],
-                        scroll=ft.ScrollMode.ALWAYS, expand=True  # vertical scroll
-                    )
-                ],
-                scroll=ft.ScrollMode.ALWAYS, expand=True  # horizontal scroll
-            )
-        ]),
+        content=ft.Column(
+            controls=[
+                # Header Row
+                ft.Row([
+                    ft.Text("Comparison Log: ", weight="bold", expand=True),
+                    ft.IconButton(
+                        icon=ft.Icons.DELETE_ROUNDED,
+                        icon_color=ft.Colors.DEEP_PURPLE_200,
+                        tooltip="Clear Log",
+                        on_click=clear_history_log,
+                    ),
+                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+
+#                ft.Divider(color=ft.Colors.DEEP_PURPLE_200, height=1),
+
+                # Scroll area
+                ft.Row(
+                    controls=[
+                        ft.Column(
+                            controls=[
+                                ft.Row([
+                                    # Header columns
+                                    ft.Container(content=log_text("ALGO", ft.FontWeight.BOLD), width=50),
+                                    ft.Container(content=log_text("MOD", ft.FontWeight.BOLD), width=40),
+                                    ft.Container(content=log_text("PREC", ft.FontWeight.BOLD), width=45),
+                                    ft.Container(content=log_text("RECL", ft.FontWeight.BOLD), width=45),
+                                    ft.Container(content=log_text("MRR", ft.FontWeight.BOLD), width=45),
+                                    ft.Container(content=log_text("nDCG", ft.FontWeight.BOLD), width=45),
+                                ], spacing=10),
+                                ft.Divider(color=ft.Colors.DEEP_PURPLE_200, height=1),
+                                # Data rows
+                                history_column,
+                            ],
+                            scroll=ft.ScrollMode.ADAPTIVE,  # vertical scroll
+                            expand=True,
+                            alignment=ft.MainAxisAlignment.START,  # keep content on top
+                        )
+                    ],
+                    scroll=ft.ScrollMode.ADAPTIVE,  # horizontal scroll
+                    expand=True,
+                    vertical_alignment=ft.CrossAxisAlignment.START,  # keep column on top
+                )
+            ],
+            spacing=0,
+            alignment=ft.MainAxisAlignment.START,  # keep main elements (header, divider, content) on top
+        ),
         bgcolor=ft.Colors.DEEP_PURPLE_900,
-        padding = 15,
-        border = ft.Border.all(1, ft.Colors.DEEP_PURPLE_200),
-        border_radius = 20,
-        col={"xs": 12, "md": 3},
-        visible=False
+        padding=15,
+        border=ft.Border.all(1, ft.Colors.DEEP_PURPLE_200),
+        border_radius=20,
+        height=FIXED_CONTAINER_HEIGHT,
+        col={"xs": 12, "md": 2.5},
     )
 
     result_row = ft.ResponsiveRow(
