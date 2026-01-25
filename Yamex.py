@@ -1,12 +1,8 @@
 import flet as ft
 import flet_video as fv
 import pandas as pd
-import random
-
-from enum import Enum
 
 from flet import UrlLauncher
-from networkx.algorithms.smallworld import random_reference
 
 from baseline import RandomBaselineRetrievalSystem
 from strategies import *
@@ -56,7 +52,7 @@ FUSION_MODALITIES = {
     Modality.ALL: ["audio", "lyrics", "video"],
 }
 
-"""
+
 for modality, modality_list in FUSION_MODALITIES.items():
     # Early fusion
     try:
@@ -76,7 +72,7 @@ for modality, modality_list in FUSION_MODALITIES.items():
         )
     except Exception as e:
         print(f"Late fusion init failed for {modality}: {e}")
-"""
+
 
 NN_MODALITIES = [
     Modality.AUDIO_AUDIO, Modality.AUDIO_LYRICS, Modality.AUDIO_VIDEO,
