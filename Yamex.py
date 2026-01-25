@@ -174,13 +174,13 @@ async def main(page: ft.Page):
 
     search_field = ft.TextField(
         hint_text="Search for a song title, an artist or an album",
-            hint_style=ft.TextStyle(color=ft.Colors.DEEP_PURPLE_800),
+            hint_style=ft.TextStyle(color=ft.Colors.DEEP_PURPLE_900),
             bgcolor=ft.Colors.WHITE,
             border_radius=20,
             border_width=1,
             border_color = ft.Colors.DEEP_PURPLE_200,
             color=ft.Colors.BLACK,
-            prefix_icon=ft.Icon(ft.Icons.SEARCH_ROUNDED, color=ft.Colors.DEEP_PURPLE_800),
+            prefix_icon=ft.Icon(ft.Icons.SEARCH_ROUNDED, color=ft.Colors.DEEP_PURPLE_900),
             expand=True
     )
 
@@ -189,6 +189,7 @@ async def main(page: ft.Page):
         if search_field.border_width is not None and search_field.border_width > 1:
             search_field.border_color = None  # take default border
             search_field.border_width = 1  # reset standard border
+            search_field.bgcolor = ft.Colors.WHITE,  # reset to standard background color
             search_field.update()
 
     search_field.on_change = on_search_change
@@ -200,13 +201,16 @@ async def main(page: ft.Page):
     dropdown_matching_songs = ft.Dropdown(
         label="Matching songs",
         label_style=ft.TextStyle(color=ft.Colors.WHITE),
+        text_style=ft.TextStyle(color=ft.Colors.WHITE),
         color=ft.Colors.WHITE,
         bgcolor=ft.Colors.DEEP_PURPLE_700,
         border_color=ft.Colors.DEEP_PURPLE_200,
+        filled=True,
+        fill_color=ft.Colors.DEEP_PURPLE_800,
         border_radius=20,
         width=600,
         visible=True,
-        on_select=lambda e: execute_retrieval(dropdown_matching_songs.value),
+        on_select=lambda e: execute_retrieval(dropdown_matching_songs.value)
     )
 
     query_info_display = ft.Container(
@@ -235,6 +239,7 @@ async def main(page: ft.Page):
     def handle_dropdown_algo_and_mod(e):
         global current_algorithm
         current_algorithm = dropdown_algorithm.value
+        current_modality = dropdown_modality.value
 
         if current_algorithm == RetrievalAlgorithms.RANDOM.value:
             search_field.value = ""  # if another algorithm is selected, clear search field
@@ -274,6 +279,16 @@ async def main(page: ft.Page):
             # Default to first option if current selection is now invalid
             if dropdown_modality.value not in [m.value for m in allowed]:
                 dropdown_modality.value = allowed[0].value if allowed else None
+
+        # Auto-Retrigger if User changes algorithm or modality after selecting a song from dropdown
+        if current_algorithm == RetrievalAlgorithms.RANDOM.value:
+            random_id = random.choice(list(song_lookup_dict.keys())) # pick a random id for the evaluator
+            execute_retrieval(random_id)
+        elif dropdown_matching_songs.value and current_algorithm != RetrievalAlgorithms.RANDOM.value:
+            execute_retrieval(dropdown_matching_songs.value)
+        elif dropdown_matching_songs.value and current_modality != dropdown_modality.value:
+            execute_retrieval(dropdown_matching_songs.value)
+
         page.update()
 
     def log_text(content, weight=ft.FontWeight.NORMAL):
@@ -313,11 +328,13 @@ async def main(page: ft.Page):
         # Validation of user input - if not valid drag attention of user to input field
         if selected_algorithm != RetrievalAlgorithms.RANDOM.value and not query:
             reset_ui_displays()
-            search_field.border_color = ft.Colors.RED_500  # to drag attention to the input field
+            search_field.bgcolor = ft.Colors.DEEP_ORANGE_100
+            search_field.border_color = ft.Colors.DEEP_ORANGE_400  # to drag attention to the input field
             search_field.border_width = 4
             search_field.update()
             return
         else:
+            search_field.bgcolor = ft.Colors.WHITE,
             search_field.border_color = ft.Colors.DEEP_PURPLE_200  # usage of standard color again
             search_field.border_width = 1
             search_field.update()
@@ -329,7 +346,11 @@ async def main(page: ft.Page):
         if not matches and dropdown_algorithm.value != RetrievalAlgorithms.RANDOM.value:
             reset_ui_displays()
             result_songs.controls.clear()
-            result_songs.controls.append(ft.Text("No results found for that query.", color="red"))
+            result_songs.controls.append(ft.Text("Sorry, no results were found for your query.",
+                                                 color=ft.Colors.DEEP_ORANGE_400,
+                                                 weight=ft.FontWeight.BOLD,
+                                                 size=20
+                                                 ))
             page.update()
             return
 
@@ -377,11 +398,11 @@ async def main(page: ft.Page):
 #                ft.TextSpan(f" [ID: {query_id}]", ft.TextStyle(size=11, color=ft.Colors.DEEP_PURPLE_300)),
             ]
             query_info_icon.visible = True
-            query_info_display.bgcolor = ft.Colors.DEEP_PURPLE_800
+            query_info_display.bgcolor = ft.Colors.DEEP_PURPLE_900
         elif selected_algorithm == RetrievalAlgorithms.RANDOM.value:
             query_info_text.value = "Random Baseline Search"
             query_info_icon.visible = False
-            query_info_display.bgcolor = ft.Colors.DEEP_PURPLE_800
+            query_info_display.bgcolor = ft.Colors.DEEP_PURPLE_900
 
 
         page.update()
@@ -432,8 +453,11 @@ async def main(page: ft.Page):
 
         # execute search
         ids, raw_metrics, scores = strategy.search(selected_id, current_slider_value)
-#        print(f"DEBUG: scores: {scores}")
-#        print(f"DEBUG: metrics: {raw_metrics}")
+
+        if ids:
+            results_title.value = f"Top Results:"
+        else:
+            results_title.value = f"Sorry, no results were found for your query."
 
         # 1. Store cleaned metrics in a dictionary (from numpy type to standard)
         current_metrics = {
@@ -526,9 +550,10 @@ async def main(page: ft.Page):
 
         results = []
         for _, row in found.iterrows():
+            display_matches_text = f'"{row["song"]}" - {row["artist"]} ({row["album_name"]})'
             results.append({
                 "id": row["id"],
-                "display": f"{row['song']} by ({row['artist']}) from ({row['album_name']})"
+                "display": display_matches_text
             })
         return results
 
@@ -733,7 +758,9 @@ async def main(page: ft.Page):
         expand=True,
     )
 
-    results_title = ft.Text("Top Results shown after search...", color=ft.Colors.WHITE)
+    results_title = ft.Text(
+        value = "Top Results shown after search...",
+        color=ft.Colors.WHITE)
 
     intermediate_results_container = ft.Container(
         content=ft.Column([
