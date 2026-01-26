@@ -211,7 +211,7 @@ async def main(page: ft.Page):
     clear_search_results_button = ft.IconButton(
         icon=ft.Icons.DELETE_SWEEP_ROUNDED,
         icon_color=ft.Colors.DEEP_PURPLE_200,
-        tooltip="Clear matching songs options",
+        tooltip="Clears search results and triggers a random search",
         on_click=clear_search_results,
     )
 
