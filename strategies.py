@@ -2,6 +2,14 @@ import random
 from enum import Enum
 from abc import ABC, abstractmethod
 
+class RetrievalAlgorithms(str, Enum):
+    RANDOM = "random"
+    UNIMODAL = "unimodal"
+    EARLY_FUSION = "early_fusion"
+    LATE_FUSION = "late_fusion"
+    NEURAL_NETWORK = "neural_network"
+
+
 class Modality(str, Enum):
     AUDIO = "audio"
     LYRICS = "lyrics"
@@ -47,7 +55,6 @@ class RandomStrategy(RetrievalStrategy):
 
     def search(self, query_id, k):
         ids, metrics, scores = self.rs.retrieve(query_id=query_id, k_neighbors=k)
-        print(ids, metrics, scores)
         return ids, metrics, scores
 
 
