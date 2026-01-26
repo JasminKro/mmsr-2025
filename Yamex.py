@@ -15,7 +15,7 @@ from nn_based import NeuralNetworkBasedRetrievalSystem
 
 DATA_ROOT = "./data"
 NN_DATA_ROOT = "./data_nn/NN_pretrained_models_and_features/"
-FIXED_CONTAINER_HEIGHT = 660
+FIXED_CONTAINER_HEIGHT = 620
 id_information_df = pd.read_csv(f"{DATA_ROOT}/id_information_mmsr.tsv", sep="\t")
 id_genres_df = pd.read_csv(f"{DATA_ROOT}/id_genres_mmsr.tsv", sep="\t")
 id_url_df = pd.read_csv(f"{DATA_ROOT}/id_url_mmsr.tsv", sep="\t")
@@ -159,12 +159,6 @@ async def main(page: ft.Page):
         ],
         text_align=ft.TextAlign.CENTER
     )
-    title_placement = ft.Row(
-        [title],
-        alignment=ft.MainAxisAlignment.CENTER,  # horizontal alignment of children
-        vertical_alignment=ft.CrossAxisAlignment.CENTER,
-        expand=True
-    )
 
     search_field = ft.TextField(
         hint_text="Search for a song title, artist, or album...",
@@ -193,7 +187,7 @@ async def main(page: ft.Page):
 
     dropdown_matching_songs = ft.Dropdown(
         label="Matching songs",
-        tooltip="Select a song you are looking for, all were found with your search query.",
+        tooltip="If the random algorithm has not been selected, all songs found with the query will be displayed here.",
         label_style=ft.TextStyle(color=ft.Colors.WHITE),
         text_style=ft.TextStyle(color=ft.Colors.WHITE),
         color=ft.Colors.WHITE,
@@ -207,11 +201,26 @@ async def main(page: ft.Page):
         on_select=lambda e: execute_retrieval(dropdown_matching_songs.value),
     )
 
+    def clear_search_results(e):
+        reset_ui_displays()
+        # switch to and fire random search
+        dropdown_algorithm.value = RetrievalAlgorithms.RANDOM.value
+        handle_dropdown_algo_and_mod(None)
+
+
+    clear_search_results_button = ft.IconButton(
+        icon=ft.Icons.DELETE_SWEEP_ROUNDED,
+        icon_color=ft.Colors.DEEP_PURPLE_200,
+        tooltip="Clear matching songs options",
+        on_click=clear_search_results,
+    )
+
     query_info_display = ft.Container(
         content=ft.Row(
             [
                 query_info_icon := ft.Icon(ft.Icons.INFO_OUTLINE, color=ft.Colors.DEEP_PURPLE_200, size=20, visible=False),
-                dropdown_matching_songs
+                dropdown_matching_songs,
+                clear_search_results_button
             ],
             alignment=ft.MainAxisAlignment.CENTER,  # horizontal centering
             vertical_alignment=ft.CrossAxisAlignment.CENTER,  # vertical centering
@@ -243,10 +252,12 @@ async def main(page: ft.Page):
 
         if current_algorithm == RetrievalAlgorithms.RANDOM.value:
             reset_search_field_style()
-            dropdown_matching_songs.disabled = True
             dropdown_matching_songs.label = "Selection not possible with random algorithm"
+            dropdown_matching_songs.value = ""
             dropdown_matching_songs.options = []
             query_info_icon.visible = True
+            dropdown_matching_songs.disabled = True
+            page.update()
         else:
             dropdown_matching_songs.disabled = False
             dropdown_matching_songs.label = "Matching songs"
@@ -310,10 +321,15 @@ async def main(page: ft.Page):
         query_info_icon.visible = False
         query_info_display.bgcolor = ft.Colors.TRANSPARENT
 
+        result_songs.controls.clear()
+        results_title.value = "Enter a search query or use random algorithm"
+        result_container.content = ""
+
         # clear metrics
         for t in [precision_text, recall_text, mmr_text, ndcg_text]:
             t.color = ft.Colors.TRANSPARENT
         metrics_display.bgcolor = ft.Colors.TRANSPARENT
+
         page.update()
 
     def handle_search_now(e=None):
@@ -371,7 +387,6 @@ async def main(page: ft.Page):
         # Select the strategy based on the dropdown value
         selected_algorithm = dropdown_algorithm.value
         selected_modality = dropdown_modality.value
-        selected_modality_list = MODALITY_MAP.get(dropdown_modality.value)
 
         result_songs.controls.clear()
 
@@ -443,18 +458,23 @@ async def main(page: ft.Page):
         ids, raw_metrics, scores = strategy.search(selected_id, current_slider_value)
 
         if ids:
-            results_title.value = f"Top Results:"
+            if selected_algorithm == RetrievalAlgorithms.RANDOM.value:
+                results_title.value = f"Random songs to explore:"
+            else:
+                results_title.value = f"Top Results:"
         else:
             results_title.value = f"Sorry, no results were found for your query."
+
+        page.update()
 
         # Store cleaned metrics in a dictionary (from numpy type to standard)
         current_metrics = {
             "algorithm": dropdown_algorithm.value,
             "modality": dropdown_modality.value,
-            "precision": float(raw_metrics.get(f"Precision@{current_slider_value}", 0.0)),
-            "recall": float(raw_metrics.get(f"Recall@{current_slider_value}", 0.0)),
-            "mrr": float(raw_metrics.get(f"MRR@{current_slider_value}", 0.0)),
-            "ndcg": float(raw_metrics.get(f"nDCG@{current_slider_value}", 0.0))
+            "precision": float(raw_metrics.get(f"Precision@{current_slider_value}") or 0.0),
+            "recall": float(raw_metrics.get(f"Recall@{current_slider_value}") or 0.0),
+            "mrr": float(raw_metrics.get(f"MRR@{current_slider_value}") or 0.0),
+            "ndcg": float(raw_metrics.get(f"nDCG@{current_slider_value}") or 0.0)
         }
         # Update the UI with the metrics values
         precision_text.value = f"Precision@{current_slider_value:<3}: {current_metrics['precision']:.4f}"
@@ -611,7 +631,7 @@ async def main(page: ft.Page):
     results_slider = ft.Slider(
         min=1,
         max=200,
-        divisions=40,  # for step size of 5 -> (max-min)/step size = (200-5)/5=39
+        divisions=40,  # for step size of 5
         value=current_slider_value,
         on_change=handle_slider,
         expand=True
@@ -688,6 +708,7 @@ async def main(page: ft.Page):
         ),
         col={"xs": 8, "sm": 4, "md": 3},
     )
+
 
     control_grid = ft.ResponsiveRow(
         controls=[
@@ -787,7 +808,7 @@ async def main(page: ft.Page):
                 ft.Row([
                     ft.Text("Comparison Log: ", weight="bold", expand=True),
                     ft.IconButton(
-                        icon=ft.Icons.DELETE_ROUNDED,
+                        icon=ft.Icons.DELETE_SWEEP_ROUNDED,
                         icon_color=ft.Colors.DEEP_PURPLE_200,
                         tooltip="Clear Log",
                         on_click=clear_history_log,
@@ -850,7 +871,7 @@ async def main(page: ft.Page):
                 control_grid,
                 ft.Column([
                     query_info_display,
-                    metrics_display,
+                    metrics_display
                 ], spacing=5),  # overrule the global setting for less space
                 result_row
             ],
