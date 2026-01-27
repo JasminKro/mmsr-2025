@@ -25,9 +25,16 @@ class RandomBaselineRetrievalSystem:
             f"MRR@{k_neighbors}": self.evaluator.mrr(query_id, rankings, k_neighbors),
             f"nDCG@{k_neighbors}": self.evaluator.ndcg(query_id, rankings, k_neighbors),
         }
+
         rand_indices = self.rng.integers(0, len(self.evaluator.ids), k_neighbors)
         rand_ids = [self.evaluator.ids[idx] for idx in rand_indices]
         scores = [rankings[idx] for idx in rand_indices]
+
+        order = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)
+        scores = [scores[i] for i in order]
+        rand_ids = [rand_ids[i] for i in order]
+        rand_indices = [rand_indices[i] for i in order]
+
         return rand_ids, metrics, scores
 
 
