@@ -1,0 +1,113 @@
+@startuml
+' Enumerations
+enum RetrievalAlgorithms {
+}
+
+enum Modality {
+}
+
+
+' Abstract Base Class
+abstract class RetrievalStrategy {
+}
+
+' Strategy Implementations
+class RandomStrategy {
+}
+
+class UnimodalStrategy {
+}
+
+class EarlyFusionStrategy {
+}
+
+class LateFusionStrategy {
+}
+
+class NeuralNetworkStrategy {
+}
+
+
+
+' Retrieval Systems
+class RandomBaselineRetrievalSystem {
+}
+
+
+class UnimodalRetrievalSystem {
+}
+
+
+class EarlyFusionRetrievalSystem {
+}
+
+
+class LateFusionRetrievalSystem {
+}
+
+class NeuralNetworkBasedRetrievalSystem {
+}
+
+
+
+class Evaluator {
+}
+
+
+
+
+class Yamex <<main>> {
+}
+
+' Relationships
+
+' Strategy Pattern
+RetrievalStrategy <|-- RandomStrategy
+RetrievalStrategy <|-- UnimodalStrategy
+RetrievalStrategy <|-- EarlyFusionStrategy
+RetrievalStrategy <|-- LateFusionStrategy
+RetrievalStrategy <|-- NeuralNetworkStrategy
+
+' Strategy uses Retrieval Systems
+RandomStrategy o-- RandomBaselineRetrievalSystem
+UnimodalStrategy o-- UnimodalRetrievalSystem
+EarlyFusionStrategy o-- EarlyFusionRetrievalSystem
+LateFusionStrategy o-- LateFusionRetrievalSystem
+NeuralNetworkStrategy o-- NeuralNetworkBasedRetrievalSystem
+
+' Retrieval Systems depend on Evaluator
+RandomBaselineRetrievalSystem *-- Evaluator
+UnimodalRetrievalSystem *-- Evaluator
+EarlyFusionRetrievalSystem *-- Evaluator
+LateFusionRetrievalSystem *-- Evaluator
+NeuralNetworkBasedRetrievalSystem *-- Evaluator
+
+' Main app uses all systems
+Yamex ..> RandomBaselineRetrievalSystem
+Yamex ..> UnimodalRetrievalSystem
+Yamex ..> EarlyFusionRetrievalSystem
+Yamex ..> LateFusionRetrievalSystem
+Yamex ..> NeuralNetworkBasedRetrievalSystem
+Yamex ..> Evaluator
+
+' Main app uses strategies
+Yamex ..> RetrievalStrategy
+Yamex ..> RetrievalAlgorithms
+Yamex ..> Modality
+
+
+RetrievalAlgorithms -[hidden]- UnimodalStrategy
+
+Modality -[hidden]down-> RandomBaselineRetrievalSystem
+Modality -[hidden]down-> UnimodalRetrievalSystem
+Modality -[hidden]down-> EarlyFusionRetrievalSystem
+Modality -[hidden]down-> LateFusionRetrievalSystem
+Modality -[hidden]down-> NeuralNetworkBasedRetrievalSystem
+
+
+' Strategies use Modality
+UnimodalStrategy ..> Modality
+EarlyFusionStrategy ..> Modality
+LateFusionStrategy ..> Modality
+NeuralNetworkStrategy ..> Modality
+@enduml
