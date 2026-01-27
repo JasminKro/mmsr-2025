@@ -17,19 +17,18 @@ class RandomBaselineRetrievalSystem:
 
     # optional convenience 
     def retrieve(self, query_id, k_neighbors):
-        scores = self.rankings(query_id)
-        top_idx = np.argsort(scores)[::-1][:k_neighbors + 1]
-        top_ids = [self.evaluator.ids[i] for i in top_idx if self.evaluator.ids[i] != query_id][:k_neighbors]
-        top_scores = [float(scores[self.evaluator.id_to_idx[tid]]) if hasattr(self.evaluator, "id_to_idx") else float(scores[i])
-                      for i, tid in zip(top_idx, [self.evaluator.ids[i] for i in top_idx]) if tid != query_id][:k_neighbors]
+        assert k_neighbors > 0
+        rankings = self.rankings(query_id)  # random ranks
         metrics = {
-            f"Precision@{k_neighbors}": self.evaluator.precision(query_id, scores, k_neighbors),
-            f"Recall@{k_neighbors}": self.evaluator.recall(query_id, scores, k_neighbors),
-            f"MRR@{k_neighbors}": self.evaluator.mrr(query_id, scores, k_neighbors),
-            f"nDCG@{k_neighbors}": self.evaluator.ndcg(query_id, scores, k_neighbors),
+            f"Precision@{k_neighbors}": self.evaluator.precision(query_id, rankings, k_neighbors),
+            f"Recall@{k_neighbors}": self.evaluator.recall(query_id, rankings, k_neighbors),
+            f"MRR@{k_neighbors}": self.evaluator.mrr(query_id, rankings, k_neighbors),
+            f"nDCG@{k_neighbors}": self.evaluator.ndcg(query_id, rankings, k_neighbors),
         }
-
-        return top_ids, metrics, top_scores
+        rand_indices = self.rng.integers(0, len(self.evaluator.ids), k_neighbors)
+        rand_ids = [self.evaluator.ids[idx] for idx in rand_indices]
+        scores = [rankings[idx] for idx in rand_indices]
+        return rand_ids, metrics, scores
 
 
 if __name__ == "__main__":
@@ -38,5 +37,10 @@ if __name__ == "__main__":
 
     rs = RandomBaselineRetrievalSystem(evaluator, seed=0)
 
-    print("\n=== RANDOM BASELINE EVALUATION ===")
-    evaluate_system(evaluator, rs, k=10)
+    ids, metrics, scores = rs.retrieve(query_id="NDroPROgWm3jBxjH", k_neighbors=5)
+    print("ids:", ids)
+    print("metrics:", metrics)
+    print("scores:", scores)
+
+    # print("\n=== RANDOM BASELINE EVALUATION ===")
+    # evaluate_system(evaluator, rs, k=10)
