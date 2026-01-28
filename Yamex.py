@@ -252,7 +252,7 @@ async def main(page: ft.Page):
 
         if current_algorithm == RetrievalAlgorithms.RANDOM.value:
             reset_search_field_style()
-            dropdown_matching_songs.label = "Selection not possible with random algorithm"
+            dropdown_matching_songs.label = "Selecting a song is not possible with random algorithm"
             dropdown_matching_songs.value = ""
             dropdown_matching_songs.options = []
             query_info_icon.visible = True
@@ -323,7 +323,7 @@ async def main(page: ft.Page):
 
         result_songs.controls.clear()
         results_title.value = "Enter a search query or use random algorithm"
-        result_container.content = ""
+        detail_container.content = ""
 
         # clear metrics
         for t in [precision_text, recall_text, mmr_text, ndcg_text]:
@@ -351,8 +351,6 @@ async def main(page: ft.Page):
             search_field.border_width = 4
             search_field.update()
             return
-        else:
-            reset_search_field_style()
 
         # Match finding
         matches = resolve_query_id(query)
@@ -399,6 +397,7 @@ async def main(page: ft.Page):
         if selected_id and dropdown_algorithm.value != RetrievalAlgorithms.RANDOM.value:
             # activate only if not random algorithm is selected
             q_details = song_lookup_dict.get(selected_id, {})
+            on_song_click(q_details, is_query=True)
             query_info_text.spans = [
                 ft.TextSpan(f"Query: ", ft.TextStyle(weight=ft.FontWeight.BOLD, color=ft.Colors.DEEP_PURPLE_200)),
                 ft.TextSpan(f"{q_details.get('song', 'Unknown')} "
@@ -459,11 +458,13 @@ async def main(page: ft.Page):
 
         if ids:
             if selected_algorithm == RetrievalAlgorithms.RANDOM.value:
-                results_title.value = f"Random songs to explore:"
+                results_title.value = f"RANDOM SONGS TO EXPLORE:"
             else:
-                results_title.value = f"Top Results:"
+                results_title.value = f"TOP RESULTS:"
         else:
             results_title.value = f"Sorry, no results were found for your query."
+
+
 
         page.update()
 
@@ -523,7 +524,7 @@ async def main(page: ft.Page):
                 "artist": res["artist"],
                 "album_name": res["album_name"],
                 "url": res["url"],
-                "genres": res.get("genre", "N/A"),
+                "genre": res.get("genre", "N/A"),
                 "score": display_score,
             }
             retrieved_results.append(song_info)
@@ -533,7 +534,7 @@ async def main(page: ft.Page):
                     leading=ft.Text(f"[{song_info['index']}]", color="white70", size=14),
                     title=ft.Text(f'"{song_info["song"]}"', color="white", weight=ft.FontWeight.BOLD),
                     subtitle=ft.Text(f"{song_info['artist']}  ({song_info['album_name']})", color="white70"),
-                    on_click=lambda e, s=song_info: on_song_click(s),
+                    on_click=lambda e, s=song_info: on_song_click(s),  # it will automatically use is_query=False
                     trailing=ft.Text(f" score: {display_score:.4f}", color="white70", size=14),
                 )
             )
@@ -567,9 +568,9 @@ async def main(page: ft.Page):
         show_controls=True  # essential for Linux
     )
 
-    def on_song_click(song_data):
+    def on_song_click(song_data, is_query=False):  # Flag: is_query
         video_url = song_data.get("url", "")
-        genres_raw = song_data.get("genres", "No genres listed")
+        genres_raw = song_data.get("genre", "No genres listed")
         clean_genres = str(genres_raw).strip("[]").replace("'", "").replace('"', '')
 
         genre_chips = ft.Row(
@@ -599,7 +600,9 @@ async def main(page: ft.Page):
             await UrlLauncher().launch_url(video_url)
 
         # Update the details container with info from the clicked song
-        result_container.content = ft.Column([
+        detail_container.content = ft.Column([
+            ft.Text("QUERY SONG" if is_query else "SELECTED RESULT SONG",
+                    size=12, color=ft.Colors.DEEP_PURPLE_200, weight=ft.FontWeight.BOLD),
             ft.Text(f'Title: "{song_data["song"]}"', size=20, weight=ft.FontWeight.BOLD),
             ft.Column([
                 ft.Text(f"Artist: {song_data['artist']}"),
@@ -767,9 +770,9 @@ async def main(page: ft.Page):
 
     results_title = ft.Text(
         value = "Top Results shown after search...",
-        color=ft.Colors.WHITE)
+        size=12, color=ft.Colors.DEEP_PURPLE_200, weight=ft.FontWeight.BOLD)
 
-    intermediate_results_container = ft.Container(
+    results_container = ft.Container(
         content=ft.Column([
             results_title,
             ft.Container(content=result_songs, expand=True),
@@ -783,8 +786,9 @@ async def main(page: ft.Page):
         col={"xs": 12, "md": 4}  # xs = small monitor: full width, md = medium = 4 of 12 colums width
     )
 
-    result_container = ft.Container(
-        content=ft.Text("Click on a song on the left to view details :-)", color=ft.Colors.WHITE),
+    detail_container = ft.Container(
+        content=ft.Text("FOR DETAILS CLICK ON A SONG ON THE LEFT OR SELECT ONE FROM THE DROPDOWN FOR MATCHING SONGS :-)",
+                        size=12, color=ft.Colors.DEEP_PURPLE_200, weight=ft.FontWeight.BOLD),
         padding=15,
         border=ft.Border.all(1, ft.Colors.DEEP_PURPLE_200),
         border_radius=20,
@@ -855,8 +859,8 @@ async def main(page: ft.Page):
 
     result_row = ft.ResponsiveRow(
         controls=[
-            intermediate_results_container,
-            result_container,
+            results_container,
+            detail_container,
             history_log_container
         ],
         spacing=25,
